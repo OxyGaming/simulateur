@@ -72,14 +72,14 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const onDiIndicatorMouseDown = readOnly ? undefined : interaction.onDiIndicatorMouseDown;
 
   // In readOnly mode all editing/selection handlers are disabled
-  const onNodeMouseDown       = readOnly ? NOOP_E : interaction.onNodeMouseDown;
-  const onNodeClick           = readOnly ? NOOP_E : interaction.onNodeClick;
+  const onNodeMouseDown       = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onNodeMouseDown;
+  const onNodeClick           = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onNodeClick;
   const onLabelMouseDown      = readOnly ? NOOP_LABEL : interaction.onLabelMouseDown;
   const onZapEapMouseDown     = readOnly ? undefined : interaction.onZapEapMouseDown;
-  const onCurveHandleMouseDown= readOnly ? NOOP_E : interaction.onCurveHandleMouseDown;
+  const onCurveHandleMouseDown= readOnly ? (_id: string, _p1: unknown, _p2: unknown, _e: React.MouseEvent) => {} : interaction.onCurveHandleMouseDown;
   const onEdgeClick           = readOnly ? (_id: string, _pos: number, _e: React.MouseEvent) => {} : interaction.onEdgeClick;
-  const onSignalClick         = readOnly ? NOOP_E : interaction.onSignalClick;
-  const onSwitchClick         = readOnly ? NOOP_E : interaction.onSwitchClick;
+  const onSignalClick         = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onSignalClick;
+  const onSwitchClick         = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onSwitchClick;
   const onTextLabelMouseDown  = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelMouseDown;
   const onTextLabelClick      = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelClick;
 
