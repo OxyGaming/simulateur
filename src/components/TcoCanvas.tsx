@@ -13,7 +13,7 @@ import { TrainMarker } from './TrainMarker';
 
 const NOOP   = () => {};
 const NOOP_E = (_e: React.MouseEvent) => {};
-const NOOP_LABEL: (type: string, id: string, offset: {x:number;y:number}, e: React.MouseEvent<SVGTextElement>) => void = () => {};
+const NOOP_LABEL: (type: string, id: string, offset: {x:number;y:number}, e: React.MouseEvent<Element>) => void = () => {};
 
 export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null);
