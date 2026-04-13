@@ -77,7 +77,7 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const onLabelMouseDown      = readOnly ? NOOP_LABEL : interaction.onLabelMouseDown;
   const onZapEapMouseDown     = readOnly ? undefined : interaction.onZapEapMouseDown;
   const onCurveHandleMouseDown= readOnly ? NOOP_E : interaction.onCurveHandleMouseDown;
-  const onEdgeClick           = readOnly ? (_id: string, _pos: {x:number;y:number}, _e: React.MouseEvent) => {} : interaction.onEdgeClick;
+  const onEdgeClick           = readOnly ? (_id: string, _pos: number, _e: React.MouseEvent) => {} : interaction.onEdgeClick;
   const onSignalClick         = readOnly ? NOOP_E : interaction.onSignalClick;
   const onSwitchClick         = readOnly ? NOOP_E : interaction.onSwitchClick;
   const onTextLabelMouseDown  = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelMouseDown;
