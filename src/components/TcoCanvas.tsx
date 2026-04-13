@@ -80,8 +80,8 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const onEdgeClick           = readOnly ? (_id: string, _pos: {x:number;y:number}, _e: React.MouseEvent) => {} : interaction.onEdgeClick;
   const onSignalClick         = readOnly ? NOOP_E : interaction.onSignalClick;
   const onSwitchClick         = readOnly ? NOOP_E : interaction.onSwitchClick;
-  const onTextLabelMouseDown  = readOnly ? NOOP_E : interaction.onTextLabelMouseDown;
-  const onTextLabelClick      = readOnly ? NOOP_E : interaction.onTextLabelClick;
+  const onTextLabelMouseDown  = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelMouseDown;
+  const onTextLabelClick      = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelClick;
 
   // Pre-compute edge→zone colour mapping
   const edgeZoneMap = new Map<string, { zoneId: string; colorIndex: number }>();
