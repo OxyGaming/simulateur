@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mode Opératoire — PRS Simulator</title>
+<style>
+  :root {
+    --bg:        #0a0f1e;
+    --bg2:       #080e1a;
+    --bg3:       #0f172a;
+    --bg4:       #1e293b;
+    --border:    #1e3a5f;
+    --border2:   #334155;
+    --text:      #e2e8f0;
+    --text2:     #94a3b8;
+    --text3:     #64748b;
+    --blue:      #4a90d9;
+    --green:     #22c55e;
+    --amber:     #f59e0b;
+    --red:       #ef4444;
+    --orange:    #f97316;
+    --purple:    #a855f7;
+    --cyan:      #22d3ee;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Nav ───────────────────────────────────────────────────────── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0;
+    padding: 0 24px;
+    height: 48px;
+    overflow-x: auto;
+  }
+  nav .brand {
+    color: var(--blue); font-family: monospace; font-weight: 700;
+    font-size: 13px; letter-spacing: 1px; white-space: nowrap;
+    margin-right: 24px; flex-shrink: 0;
+  }
+  nav a {
+    color: var(--text3); text-decoration: none; font-size: 12px;
+    padding: 0 14px; height: 48px; display: flex; align-items: center;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+    transition: color .15s, border-color .15s;
+  }
+  nav a:hover { color: var(--text); }
+  nav a.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* ── Layout ────────────────────────────────────────────────────── */
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 72px 24px 80px;
+  }
+
+  /* ── Sections ──────────────────────────────────────────────────── */
+  section {
+    margin-bottom: 64px;
+    scroll-margin-top: 64px;
+  }
+  .section-tag {
+    display: inline-block;
+    font-size: 10px; font-family: monospace; letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--blue); background: rgba(74,144,217,.12);
+    border: 1px solid rgba(74,144,217,.3);
+    padding: 2px 10px; border-radius: 3px; margin-bottom: 10px;
+  }
+  h1 { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  h2 { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+  h3 { font-size: 15px; font-weight: 600; color: var(--text2); margin-bottom: 10px; margin-top: 20px; }
+  p  { color: var(--text2); margin-bottom: 12px; }
+
+  /* ── Diagram container ─────────────────────────────────────────── */
+  .diagram {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  .diagram-label {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    font-size: 11px; font-family: monospace; color: var(--text3);
+    letter-spacing: .5px;
+  }
+  .diagram svg {
+    display: block;
+    width: 100%;
+  }
+
+  /* ── Steps ─────────────────────────────────────────────────────── */
+  .steps { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+  .step {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 16px;
+  }
+  .step-num {
+    background: var(--blue); color: #fff;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+  }
+  .step-content { flex: 1; }
+  .step-title { font-weight: 600; color: var(--text); margin-bottom: 4px; font-size: 13px; }
+  .step-desc  { color: var(--text2); font-size: 12px; }
+
+  /* ── Kbd / shortcut ────────────────────────────────────────────── */
+  kbd {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 3px; padding: 1px 6px;
+    font-family: monospace; font-size: 11px; color: var(--text3);
+  }
+
+  /* ── Info / warning ────────────────────────────────────────────── */
+  .info, .warn, .tip {
+    border-radius: 6px; padding: 12px 16px; margin: 16px 0;
+    font-size: 13px;
+  }
+  .info { background: rgba(74,144,217,.1); border-left: 3px solid var(--blue); color: var(--text2); }
+  .warn { background: rgba(239,68,68,.1); border-left: 3px solid var(--red); color: #fca5a5; }
+  .tip  { background: rgba(34,197,94,.1); border-left: 3px solid var(--green); color: #86efac; }
+
+  /* ── Legend ────────────────────────────────────────────────────── */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text2);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .legend-line {
+    width: 24px; height: 3px; border-radius: 2px; flex-shrink: 0;
+  }
+
+  /* ── Two column ────────────────────────────────────────────────── */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
+
+  /* ── Shortcut table ────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; background: var(--bg2); color: var(--text3);
+       font-size: 11px; letter-spacing: .5px; font-weight: 600; text-transform: uppercase;
+       border-bottom: 1px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  /* ── State badge ───────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 3px;
+    font-size: 11px; font-family: monospace; font-weight: 700;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ── Divider ───────────────────────────────────────────────────── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* ── Active nav tracking ────────────────────────────────────────── */
+  .highlight-box {
+    position: relative;
+    border: 1px dashed var(--border2);
+    border-radius: 4px; padding: 2px 6px;
+    font-size: 11px; font-family: monospace; color: var(--text2);
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">PRS SIMULATOR</span>
+  <a href="#overview"     class="active">Vue d'ensemble</a>
+  <a href="#construction">Construction TCO</a>
+  <a href="#pupitre">     Pupitre PRS</a>
+  <a href="#itineraires"> Itinéraires</a>
+  <a href="#destruction"> Destruction</a>
+  <a href="#fc">          FC / Annulateurs</a>
+  <a href="#simulation">  Simulation</a>
+  <a href="#diagnostic">  Diagnostic</a>
+  <a href="#apprenant">   Vue apprenant</a>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     1. VUE D'ENSEMBLE
+═══════════════════════════════════════════════════════════════ -->
+<section id="overview">
+  <span class="section-tag">01 — Introduction</span>
+  <h1>PRS Simulator — Mode Opératoire</h1>
+  <p>Ce simulateur reproduit le fonctionnement d'un poste PRS (Poste à Relais Statiques).
+  Il permet au formateur de construire une topologie de voie, de configurer un pupitre d'exploitation,
+  et à l'apprenant de pratiquer la formation et la destruction d'itinéraires.</p>
+
+  <div class="diagram">
+    <div class="diagram-label">Interface principale — Vue formateur</div>
+    <svg viewBox="0 0 860 420" style="background:#0a0f1e">
+
+      <!-- Toolbar -->
+      <rect x="0" y="0" width="860" height="38" fill="#080e1a" />
+      <rect x="0" y="37" width="860" height="1" fill="#1e3a5f" />
+      <text x="14" y="24" fill="#4a90d9" font-family="monospace" font-size="11" font-weight="700" letter-spacing="1">PRS SIMULATOR</text>
+      <!-- Mode buttons -->
+      <g font-family="monospace" font-size="9" fill="#94a3b8">
+        <rect x="120" y="8" width="60" height="22" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
+        <text x="150" y="23" text-anchor="middle" fill="white">Sélection</text>
+        <rect x="186" y="8" width="50" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="211" y="23" text-anchor="middle">Nœud</text>
+        <rect x="242" y="8" width="54" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="269" y="23" text-anchor="middle">Tronçon</text>
+        <rect x="302" y="8" width="58" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="331" y="23" text-anchor="middle">Zone CDV</text>
+        <rect x="366" y="8" width="46" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="389" y="23" text-anchor="middle">Signal</text>
+        <rect x="418" y="8" width="50" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="443" y="23" text-anchor="middle">Aiguille</text>
+        <rect x="474" y="8" width="40" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="494" y="23" text-anchor="middle">Train</text>
+      </g>
+      <rect x="730" y="8" width="80" height="22" rx="4" fill="#0c1f3a" stroke="#1e4d8c" stroke-width="1"/>
+      <text x="770" y="23" text-anchor="middle" font-family="monospace" font-size="9" fill="#60a5fa">Vue apprenant</text>
+
+      <!-- Zone labels (annotations) -->
+      <!-- PUPITRE -->
+      <rect x="0" y="38" width="130" height="340" fill="#080e1a" stroke-right="none"/>
+      <rect x="129" y="38" width="1" height="340" fill="#1e3a5f"/>
+      <text x="65" y="60" text-anchor="middle" font-family="monospace" font-size="9" fill="#4a90d9" font-weight="700">PUPITRE PRS</text>
+      <!-- mini buttons in pupitre -->
+      <rect x="10" y="70" width="34" height="34" rx="4" fill="#1a3a1a" stroke="#16a34a" stroke-width="1.5"/>
+      <circle cx="27" cy="80" r="4" fill="#4ade80"/>
+      <text x="27" y="97" text-anchor="middle" font-family="monospace" font-size="7" fill="#4ade80">A→B</text>
+      <rect x="50" y="70" width="34" height="34" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <circle cx="67" cy="80" r="4" fill="#0f172a"/>
+      <text x="67" y="97" text-anchor="middle" font-family="monospace" font-size="7" fill="#64748b">B→C</text>
+      <rect x="90" y="70" width="34" height="34" rx="4" fill="#422006" stroke="#d97706" stroke-width="1.5"/>
+      <circle cx="107" cy="80" r="4" fill="#f59e0b"/>
+      <text x="107" y="97" text-anchor="middle" font-family="monospace" font-size="7" fill="#fcd34d">C→D</text>
+
+      <!-- CANVAS -->
+      <rect x="130" y="38" width="580" height="340" fill="#0a0f1e"/>
+
+      <!-- TCO Content — concrete scene -->
+      <!-- Zone band CDV1 (blue, tronçon horizontal) -->
+      <path d="M 200 220 Q 290 220 380 220" stroke="#3b82f6" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+      <!-- Zone band CDV2 (green, après aiguille branche droite) -->
+      <path d="M 380 220 Q 460 220 540 220" stroke="#22c55e" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+      <!-- Zone band CDV3 (orange, branche déviée) -->
+      <path d="M 380 220 Q 440 255 500 290" stroke="#f97316" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+
+      <!-- Tracks -->
+      <path d="M 200 220 Q 290 220 380 220" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M 380 220 Q 460 220 540 220" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M 380 220 Q 440 255 500 290" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M 160 220 Q 180 220 200 220" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+
+      <!-- Nodes (double bar ┆┆) -->
+      <g opacity="1">
+        <!-- Node A -->
+        <rect x="196" y="214" width="2" height="12" fill="#64748b" rx="1"/>
+        <rect x="202" y="214" width="2" height="12" fill="#64748b" rx="1"/>
+        <text x="199" y="238" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">A</text>
+        <!-- Node B -->
+        <rect x="536" y="214" width="2" height="12" fill="#64748b" rx="1"/>
+        <rect x="542" y="214" width="2" height="12" fill="#64748b" rx="1"/>
+        <text x="539" y="238" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">B</text>
+        <!-- Node C (dévié) -->
+        <rect x="496" y="284" width="2" height="12" fill="#64748b" rx="1"/>
+        <rect x="502" y="284" width="2" height="12" fill="#64748b" rx="1"/>
+        <text x="499" y="308" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">C</text>
+      </g>
+
+      <!-- Signal fermé sur CDV1 -->
+      <line x1="280" y1="220" x2="280" y2="204" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="276" y1="220" x2="284" y2="220" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="280" cy="198" r="6" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="280" cy="198" r="4" fill="#ef4444"/>
+      <text x="280" y="188" text-anchor="middle" font-family="monospace" font-size="8" fill="#64748b">Sig1</text>
+
+      <!-- Signal ouvert sur CDV2 -->
+      <line x1="460" y1="220" x2="460" y2="204" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="456" y1="220" x2="464" y2="220" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="460" cy="198" r="9" fill="none" stroke="#22c55e" stroke-width="2.5" opacity="0.35"/>
+      <circle cx="460" cy="198" r="6" fill="#0f172a" stroke="#16a34a" stroke-width="1.5"/>
+      <circle cx="460" cy="198" r="4" fill="#22c55e"/>
+      <text x="460" y="188" text-anchor="middle" font-family="monospace" font-size="8" fill="#64748b">Sig2</text>
+
+      <!-- Aiguille (switch) -->
+      <circle cx="380" cy="220" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+      <!-- branch straight -->
+      <line x1="380" y1="220" x2="408" y2="220" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+      <!-- branch diverging -->
+      <line x1="380" y1="220" x2="404" y2="243" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <!-- entry -->
+      <line x1="356" y1="220" x2="380" y2="220" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+      <text x="380" y="248" text-anchor="middle" font-family="monospace" font-size="8" fill="#94a3b8">Aig1</text>
+
+      <!-- Zone badges -->
+      <rect x="258" y="208" width="44" height="16" rx="3" fill="#3b82f633" stroke="#3b82f6" stroke-width="1"/>
+      <text x="280" y="216" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#3b82f6" font-weight="700">CDV1</text>
+      <rect x="426" y="208" width="44" height="16" rx="3" fill="#22c55e33" stroke="#22c55e" stroke-width="1"/>
+      <text x="448" y="216" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#22c55e" font-weight="700">CDV2</text>
+      <rect x="422" y="256" width="44" height="16" rx="3" fill="#f9731633" stroke="#f97316" stroke-width="1"/>
+      <text x="444" y="264" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#f97316" font-weight="700">CDV3</text>
+
+      <!-- PROPERTIES PANEL -->
+      <rect x="710" y="38" width="150" height="340" fill="#080e1a"/>
+      <rect x="710" y="38" width="1" height="340" fill="#1e3a5f"/>
+      <text x="785" y="62" text-anchor="middle" font-family="monospace" font-size="10" fill="#94a3b8" font-weight="700" letter-spacing="1">PROPRIÉTÉS</text>
+
+      <!-- Annotations with arrows -->
+      <g font-family="monospace" font-size="10" fill="#4a90d9">
+        <!-- Toolbar annotation -->
+        <path d="M 300 0 L 300 38" stroke="#4a90d9" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+        <!-- Pupitre annotation -->
+        <line x1="130" y1="260" x2="158" y2="260" stroke="#4a90d9" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+        <text x="132" y="360" font-size="8" fill="#4a90d9">PUPITRE</text>
+        <!-- Canvas annotation -->
+        <text x="395" y="380" text-anchor="middle" font-size="8" fill="#4a90d9">CANVAS TCO</text>
+        <!-- Properties annotation -->
+        <text x="785" y="385" text-anchor="middle" font-size="8" fill="#4a90d9">PROPRIÉTÉS</text>
+      </g>
+
+      <!-- Area labels at bottom -->
+      <rect x="0" y="378" width="130" height="20" fill="rgba(74,144,217,.08)" stroke-top="1px solid #1e3a5f"/>
+      <text x="65" y="390" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">① Pupitre PRS</text>
+      <rect x="130" y="378" width="580" height="20" fill="rgba(74,144,217,.05)"/>
+      <text x="420" y="390" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">② Canvas TCO (zoom molette)</text>
+      <rect x="710" y="378" width="150" height="20" fill="rgba(74,144,217,.08)"/>
+      <text x="785" y="390" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">③ Propriétés</text>
+      <!-- toolbar -->
+      <rect x="0" y="38" width="860" height="18" fill="rgba(74,144,217,.05)"/>
+      <text x="430" y="52" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">④ Barre d'outils (raccourcis clavier)</text>
+    </svg>
+  </div>
+
+  <table>
+    <tr><th>Zone</th><th>Rôle</th></tr>
+    <tr><td>① Pupitre PRS</td><td>Boutons d'itinéraires, FC, Annulateurs. Redimensionnable par glissé de la bordure.</td></tr>
+    <tr><td>② Canvas TCO</td><td>Topologie de voie interactive. Zoom molette, pan clic-glissé.</td></tr>
+    <tr><td>③ Propriétés</td><td>Paramètres de l'objet sélectionné.</td></tr>
+    <tr><td>④ Barre d'outils</td><td>Modes d'édition, export/import JSON, accès vue apprenant.</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     2. CONSTRUCTION DU TCO
+═══════════════════════════════════════════════════════════════ -->
+<section id="construction">
+  <span class="section-tag">02 — Construction</span>
+  <h2>Construire la topologie TCO</h2>
+  <p>La construction suit un ordre logique : nœuds → tronçons → zones CDV → signaux → aiguilles.</p>
+
+  <h3>Éléments disponibles</h3>
+  <div class="diagram">
+    <div class="diagram-label">Catalogue des objets TCO</div>
+    <svg viewBox="0 0 800 160" style="background:#0f172a">
+
+      <!-- Nœud -->
+      <rect x="20" y="20" width="130" height="120" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="85" y="40" text-anchor="middle" font-family="monospace" font-size="10" fill="#4a90d9">Nœud</text>
+      <rect x="79" y="65" width="2" height="16" fill="#64748b" rx="1"/>
+      <rect x="85" y="65" width="2" height="16" fill="#64748b" rx="1"/>
+      <text x="83" y="100" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">NomVoie</text>
+      <text x="85" y="130" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">Raccourci : Z</text>
+
+      <!-- Tronçon -->
+      <rect x="165" y="20" width="130" height="120" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="230" y="40" text-anchor="middle" font-family="monospace" font-size="10" fill="#4a90d9">Tronçon</text>
+      <path d="M 180 80 Q 230 70 280 80" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <text x="230" y="130" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">Raccourci : C</text>
+
+      <!-- Zone CDV -->
+      <rect x="310" y="20" width="130" height="120" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="375" y="40" text-anchor="middle" font-family="monospace" font-size="10" fill="#4a90d9">Zone CDV</text>
+      <path d="M 325 80 Q 375 80 425 80" stroke="#3b82f6" stroke-width="10" fill="none" opacity="0.25" stroke-linecap="round"/>
+      <path d="M 325 80 Q 375 80 425 80" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <rect x="350" y="71" width="50" height="16" rx="3" fill="#3b82f633" stroke="#3b82f6" stroke-width="1"/>
+      <text x="375" y="79" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#3b82f6" font-weight="700">CDV1</text>
+      <text x="375" y="130" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">Raccourci : W</text>
+
+      <!-- Signal -->
+      <rect x="455" y="20" width="130" height="120" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="520" y="40" text-anchor="middle" font-family="monospace" font-size="10" fill="#4a90d9">Signal</text>
+      <path d="M 480 85 Q 520 85 560 85" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <line x1="520" y1="85" x2="520" y2="69" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="515" y1="85" x2="525" y2="85" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
+      <!-- signal ouvert -->
+      <circle cx="520" cy="63" r="9" fill="none" stroke="#22c55e" stroke-width="2.5" opacity="0.35"/>
+      <circle cx="520" cy="63" r="6" fill="#0f172a" stroke="#16a34a" stroke-width="1.5"/>
+      <circle cx="520" cy="63" r="4" fill="#22c55e"/>
+      <!-- signal fermé -->
+      <line x1="520" y1="95" x2="520" y2="111" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="520" cy="117" r="6" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="520" cy="117" r="4" fill="#ef4444"/>
+      <text x="520" y="148" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">Raccourci : S</text>
+
+      <!-- Aiguille -->
+      <rect x="600" y="20" width="175" height="120" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="687" y="40" text-anchor="middle" font-family="monospace" font-size="10" fill="#4a90d9">Aiguille</text>
+      <line x1="620" y1="85" x2="660" y2="85" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="660" cy="85" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+      <line x1="660" y1="85" x2="700" y2="85" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+      <line x1="660" y1="85" x2="695" y2="112" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <text x="661" y="66" text-anchor="middle" font-family="monospace" font-size="7" fill="#94a3b8">directe ●</text>
+      <text x="695" y="124" text-anchor="middle" font-family="monospace" font-size="7" fill="#334155">déviée ○</text>
+      <text x="687" y="148" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">Raccourci : A</text>
+    </svg>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Placer les nœuds <kbd>Z</kbd></div>
+        <div class="step-desc">Chaque nœud représente une jonction de voie (entrée/sortie de zone, point de branchement). Cliquez sur le canvas pour les placer. Glissez le nom pour le repositionner.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Tracer les tronçons <kbd>C</kbd></div>
+        <div class="step-desc">Cliquez sur le nœud de départ, puis sur le nœud d'arrivée. Le tronçon est automatiquement courbé. Une fois sélectionné, tirez la poignée bleue pour ajuster la courbure.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Définir les zones CDV <kbd>W</kbd></div>
+        <div class="step-desc">Passez en mode Zone CDV, sélectionnez une zone dans le panneau Propriétés (ou créez-en une), puis cliquez sur les tronçons à inclure. Chaque zone prend automatiquement une couleur distincte.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Placer les signaux <kbd>S</kbd></div>
+        <div class="step-desc">Cliquez sur un tronçon pour y déposer un signal. Dans le panneau Propriétés : ajustez la position (slider 0–100%), le sens de circulation (A→B ou B→A), et configurez les zones d'approche (ZAp / EAp).</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-title">Placer les aiguilles <kbd>A</kbd></div>
+        <div class="step-desc">Cliquez sur un nœud existant pour y attacher une aiguille. Dans les Propriétés : désignez le tronçon d'entrée, la branche directe, la branche déviée. L'aiguille est initialement en position directe (straight).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip">Pour créer des nœuds cachés (jonctions sans balise visuelle), cochez "Masqué" dans le panneau Propriétés. Utile pour les entrées/sorties de zone hors TCO visible.</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     3. PUPITRE PRS
+═══════════════════════════════════════════════════════════════ -->
+<section id="pupitre">
+  <span class="section-tag">03 — Pupitre</span>
+  <h2>Configurer le Pupitre PRS</h2>
+  <p>Le pupitre regroupe les boutons d'exploitation : itinéraires, fermetures de contrôle (FC) et annulateurs. Il se configure en mode CONFIG, puis s'utilise en mode EXPL.</p>
+
+  <div class="cols">
+    <div class="diagram">
+      <div class="diagram-label">Mode CONFIG — ajout de boutons</div>
+      <svg viewBox="0 0 240 320" style="background:#080e1a">
+        <text x="120" y="22" text-anchor="middle" font-family="monospace" font-size="10" fill="#4a90d9" font-weight="700">PUPITRE PRS</text>
+        <rect x="170" y="10" width="56" height="18" rx="3" fill="#0c2a4a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="198" y="23" text-anchor="middle" font-family="monospace" font-size="8" fill="#60a5fa">CONFIG.</text>
+
+        <!-- Section itinéraires -->
+        <text x="12" y="52" font-family="monospace" font-size="7" fill="#334155" letter-spacing="1">ITINÉRAIRES</text>
+        <!-- Bouton configuré (route A→B) -->
+        <rect x="12" y="58" width="50" height="50" rx="4" fill="#1a3a1a" stroke="#16a34a" stroke-width="1.5"/>
+        <circle cx="37" cy="70" r="4" fill="#4ade80"/>
+        <text x="37" y="85" text-anchor="middle" font-family="monospace" font-size="7" fill="#4ade80">A→B</text>
+        <text x="37" y="100" text-anchor="middle" font-family="monospace" font-size="6" fill="#16a34a">A2→B1</text>
+        <!-- Bouton non configuré (bord dashed) -->
+        <rect x="68" y="58" width="50" height="50" rx="4" fill="#1e293b" stroke="#b45309" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="93" y="87" text-anchor="middle" font-family="monospace" font-size="7" fill="#1e3a5f">B→C</text>
+        <text x="93" y="100" text-anchor="middle" font-family="monospace" font-size="6" fill="#b45309">— itin —</text>
+        <!-- gear icon (⚙) -->
+        <text x="17" y="72" font-family="monospace" font-size="8" fill="#b45309">⚙</text>
+        <!-- Add button -->
+        <rect x="124" y="58" width="50" height="50" rx="4" fill="transparent" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="149" y="87" text-anchor="middle" font-family="monospace" font-size="18" fill="#334155">+</text>
+
+        <!-- Section FC -->
+        <text x="12" y="128" font-family="monospace" font-size="7" fill="#334155" letter-spacing="1">FERMETURES DE CONTRÔLE</text>
+        <rect x="12" y="134" width="50" height="50" rx="4" fill="transparent" stroke="#4a1d96" stroke-width="1"/>
+        <circle cx="37" cy="152" r="21" fill="#0d0a1a" stroke="#4a1d96" stroke-width="1.5"/>
+        <circle cx="37" cy="152" r="17" fill="#450a0a" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="34" y="138" width="6" height="11" rx="3" fill="white"/>
+        <circle cx="37" cy="152" r="2.5" fill="#1a0a1a" stroke="white" stroke-width="0.8" opacity="0.6"/>
+        <text x="37" y="178" text-anchor="middle" font-family="monospace" font-size="7" fill="#7c3aed">FC-1</text>
+
+        <!-- Section Annulateurs -->
+        <text x="12" y="200" font-family="monospace" font-size="7" fill="#334155" letter-spacing="1">ANNULATEURS</text>
+        <rect x="12" y="206" width="50" height="50" rx="4" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="17" y="218" font-family="monospace" font-size="6" fill="#f59e0b">ANN</text>
+        <circle cx="37" cy="225" r="4" fill="#f59e0b"/>
+        <text x="37" y="243" text-anchor="middle" font-family="monospace" font-size="7" fill="#fcd34d">Ann.1</text>
+
+        <!-- Section Diagnostic -->
+        <text x="12" y="270" font-family="monospace" font-size="7" fill="#334155" letter-spacing="1">DIAGNOSTIC</text>
+        <rect x="12" y="276" width="50" height="30" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+        <circle cx="37" cy="285" r="4" fill="#0f172a"/>
+        <text x="37" y="298" text-anchor="middle" font-family="monospace" font-size="6" fill="#475569">Test Zone</text>
+        <rect x="68" y="276" width="60" height="30" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+        <circle cx="98" cy="285" r="4" fill="#0f172a"/>
+        <text x="98" y="298" text-anchor="middle" font-family="monospace" font-size="6" fill="#475569">Test Aiguille</text>
+      </svg>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-label">Panneau de configuration d'un itinéraire</div>
+      <svg viewBox="0 0 240 320" style="background:#080e1a">
+        <!-- Config panel -->
+        <rect x="8" y="8" width="224" height="304" rx="5" fill="#0f172a" stroke="#1e3a5f" stroke-width="1"/>
+        <text x="18" y="28" font-family="monospace" font-size="10" fill="#60a5fa" font-weight="700">A→B</text>
+        <rect x="190" y="16" width="34" height="18" rx="3" fill="#450a0a" stroke="#7f1d1d" stroke-width="1"/>
+        <text x="207" y="28" text-anchor="middle" font-family="monospace" font-size="8" fill="#fca5a5">Suppr.</text>
+
+        <text x="18" y="52" font-family="monospace" font-size="8" fill="#475569">Libellé</text>
+        <rect x="18" y="58" width="200" height="22" rx="3" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="28" y="73" font-family="monospace" font-size="9" fill="#94a3b8">A→B</text>
+
+        <text x="18" y="100" font-family="monospace" font-size="8" fill="#475569">Signal de départ</text>
+        <rect x="18" y="106" width="200" height="22" rx="3" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="28" y="121" font-family="monospace" font-size="9" fill="#94a3b8">Sig1 (A→B) →</text>
+
+        <text x="18" y="148" font-family="monospace" font-size="8" fill="#475569">Conditions de zones</text>
+        <!-- zone condition rows -->
+        <rect x="18" y="154" width="200" height="22" rx="3" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="28" y="169" font-family="monospace" font-size="9" fill="#94a3b8">CDV1</text>
+        <rect x="100" y="157" width="32" height="14" rx="2" fill="#1a3a1a" stroke="#16a34a" stroke-width="1"/>
+        <text x="116" y="165" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="7" fill="#4ade80">Tr.</text>
+        <rect x="136" y="157" width="32" height="14" rx="2" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="152" y="165" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="7" fill="#475569">ZP</text>
+        <rect x="172" y="157" width="32" height="14" rx="2" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="188" y="165" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="7" fill="#475569">App.</text>
+
+        <rect x="18" y="180" width="200" height="22" rx="3" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="28" y="195" font-family="monospace" font-size="9" fill="#94a3b8">CDV2</text>
+        <rect x="100" y="183" width="32" height="14" rx="2" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="116" y="191" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="7" fill="#475569">Tr.</text>
+        <rect x="136" y="183" width="32" height="14" rx="2" fill="#1a3a1a" stroke="#16a34a" stroke-width="1"/>
+        <text x="152" y="191" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="7" fill="#4ade80">ZP</text>
+        <rect x="172" y="183" width="32" height="14" rx="2" fill="#0a0f1e" stroke="#334155" stroke-width="1"/>
+        <text x="188" y="191" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="7" fill="#475569">App.</text>
+
+        <text x="18" y="224" font-family="monospace" font-size="7" fill="#475569">ZP = protection · ZEA = espacement · App. = approche · Tr. = transit</text>
+
+        <!-- Save button -->
+        <rect x="18" y="275" width="200" height="28" rx="4" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1"/>
+        <text x="118" y="293" text-anchor="middle" font-family="monospace" font-size="10" fill="white" font-weight="700">Enregistrer</text>
+      </svg>
+    </div>
+  </div>
+
+  <h3>Types de boutons</h3>
+  <table>
+    <tr><th>Type</th><th>Apparence</th><th>Rôle</th></tr>
+    <tr><td>Itinéraire</td><td><span class="badge" style="background:#1a3a1a;border:1px solid #16a34a"><span class="badge-dot" style="background:#4ade80"></span><span style="color:#4ade80">A→B ACTIF</span></span></td><td>Formation/destruction d'itinéraire. LED verte quand actif.</td></tr>
+    <tr><td>FC (Fermeture de Contrôle)</td><td><span class="badge" style="background:#450a0a;border:1px solid #dc2626"><span style="color:#fca5a5">FC-1 ACTIF</span></span></td><td>Bloque l'ouverture du signal associé. Bouton rotatif, rouge quand actif.</td></tr>
+    <tr><td>Annulateur</td><td><span class="badge" style="background:#422006;border:1px solid #f59e0b"><span class="badge-dot" style="background:#f59e0b"></span><span style="color:#fcd34d">Ann.1 ACTIF</span></span></td><td>Annule la détection des zones configurées. LED ambre quand actif.</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     4. FORMATION D'ITINÉRAIRE
+═══════════════════════════════════════════════════════════════ -->
+<section id="itineraires">
+  <span class="section-tag">04 — Itinéraires</span>
+  <h2>Formation d'un itinéraire</h2>
+  <p>La formation d'un itinéraire se fait en deux temps : appui bouton → vérification → activation automatique après 2,5 s.</p>
+
+  <div class="diagram">
+    <div class="diagram-label">États successifs du bouton et du TCO</div>
+    <svg viewBox="0 0 800 220" style="background:#0f172a">
+
+      <!-- ÉTAT 1 : IDLE -->
+      <rect x="10" y="10" width="175" height="200" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="97" y="32" text-anchor="middle" font-family="monospace" font-size="9" fill="#4a90d9">① Repos (IDLE)</text>
+      <!-- track -->
+      <path d="M 25 100 Q 97 100 170 100" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="71" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="77" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="116" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="122" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <!-- signal fermé -->
+      <line x1="74" y1="100" x2="74" y2="84" stroke="#64748b" stroke-width="2"/>
+      <circle cx="74" cy="78" r="5" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="74" cy="78" r="3" fill="#ef4444"/>
+      <!-- bouton idle -->
+      <rect x="55" y="150" width="85" height="45" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+      <circle cx="97" cy="163" r="4" fill="#0f172a"/>
+      <text x="97" y="183" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">A→B</text>
+
+      <!-- Flèche 1→2 -->
+      <path d="M 195 110 L 220 110" stroke="#4a90d9" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="207" y="105" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">clic</text>
+      <defs>
+        <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#4a90d9"/>
+        </marker>
+      </defs>
+
+      <!-- ÉTAT 2 : FORMING -->
+      <rect x="225" y="10" width="175" height="200" rx="6" fill="#080e1a" stroke="#d97706" stroke-width="1"/>
+      <text x="312" y="32" text-anchor="middle" font-family="monospace" font-size="9" fill="#d97706">② Formation (2,5 s)</text>
+      <!-- track (inchangé) -->
+      <path d="M 240 100 Q 312 100 385 100" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="286" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="292" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="331" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="337" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <!-- signal fermé -->
+      <line x1="289" y1="100" x2="289" y2="84" stroke="#64748b" stroke-width="2"/>
+      <circle cx="289" cy="78" r="5" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="289" cy="78" r="3" fill="#ef4444"/>
+      <!-- bouton forming (clignotant ambre) -->
+      <rect x="270" y="150" width="85" height="45" rx="4" fill="#422006" stroke="#d97706" stroke-width="2"/>
+      <circle cx="312" cy="163" r="4" fill="#f59e0b"/>
+      <text x="312" y="178" text-anchor="middle" font-family="monospace" font-size="9" fill="#fcd34d">A→B</text>
+      <text x="312" y="191" text-anchor="middle" font-family="monospace" font-size="7" fill="#d97706">FORM.</text>
+      <text x="312" y="205" text-anchor="middle" font-family="monospace" font-size="7" fill="#d97706">↻ 2,5s</text>
+
+      <!-- Flèche 2→3 -->
+      <path d="M 410 110 L 435 110" stroke="#4a90d9" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="422" y="105" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">auto</text>
+
+      <!-- ÉTAT 3 : ACTIF -->
+      <rect x="440" y="10" width="175" height="200" rx="6" fill="#080e1a" stroke="#16a34a" stroke-width="1"/>
+      <text x="527" y="32" text-anchor="middle" font-family="monospace" font-size="9" fill="#16a34a">③ Actif (ouvert)</text>
+      <!-- Zone transit highlight -->
+      <path d="M 455 100 Q 527 100 600 100" stroke="#f59e0b" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+      <path d="M 455 100 Q 527 100 600 100" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="501" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="507" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="546" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="552" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <!-- signal ouvert -->
+      <line x1="504" y1="100" x2="504" y2="84" stroke="#64748b" stroke-width="2"/>
+      <circle cx="504" cy="78" r="9" fill="none" stroke="#22c55e" stroke-width="2.5" opacity="0.35"/>
+      <circle cx="504" cy="78" r="5" fill="#0f172a" stroke="#16a34a" stroke-width="1.5"/>
+      <circle cx="504" cy="78" r="3" fill="#22c55e"/>
+      <!-- badge zone actif -->
+      <rect x="500" y="108" width="54" height="14" rx="3" fill="#f59e0b33" stroke="#f59e0b" stroke-width="1"/>
+      <text x="527" y="115" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#f59e0b" font-weight="700">CDV1</text>
+      <!-- bouton actif vert -->
+      <rect x="484" y="150" width="85" height="45" rx="4" fill="#1a3a1a" stroke="#16a34a" stroke-width="2"/>
+      <circle cx="527" cy="163" r="4" fill="#4ade80"/>
+      <text x="527" y="178" text-anchor="middle" font-family="monospace" font-size="9" fill="#4ade80">A→B</text>
+      <text x="527" y="191" text-anchor="middle" font-family="monospace" font-size="7" fill="#16a34a">ACTIF</text>
+
+      <!-- Flèche 3→4 -->
+      <path d="M 625 110 L 650 110" stroke="#4a90d9" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="637" y="105" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">clic</text>
+
+      <!-- ÉTAT 4 : DÉTRUIT -->
+      <rect x="655" y="10" width="140" height="200" rx="6" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="725" y="32" text-anchor="middle" font-family="monospace" font-size="9" fill="#334155">④ Détruit</text>
+      <!-- track normal -->
+      <path d="M 668 100 Q 725 100 782 100" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="699" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="705" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="744" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <rect x="750" y="91" width="2" height="18" fill="#64748b" rx="1"/>
+      <!-- signal fermé -->
+      <line x1="702" y1="100" x2="702" y2="84" stroke="#64748b" stroke-width="2"/>
+      <circle cx="702" cy="78" r="5" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="702" cy="78" r="3" fill="#ef4444"/>
+      <!-- bouton idle -->
+      <rect x="682" y="150" width="85" height="45" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+      <circle cx="724" cy="163" r="4" fill="#0f172a"/>
+      <text x="724" y="183" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">A→B</text>
+    </svg>
+  </div>
+
+  <h3>Cas particuliers</h3>
+  <div class="cols">
+    <div>
+      <h3>Conflit d'itinéraire</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 200 80" style="background:#0f172a">
+          <rect x="10" y="15" width="85" height="50" rx="4" fill="#450a0a" stroke="#dc2626" stroke-width="2"/>
+          <circle cx="52" cy="28" r="4" fill="#ef4444"/>
+          <text x="52" y="43" text-anchor="middle" font-family="monospace" font-size="9" fill="#fca5a5">A→B</text>
+          <text x="52" y="56" text-anchor="middle" font-family="monospace" font-size="7" fill="#dc2626">CONF.</text>
+          <text x="110" y="30" font-family="monospace" font-size="9" fill="#fca5a5">ZP occupée</text>
+          <text x="110" y="44" font-family="monospace" font-size="9" fill="#fca5a5">CIA actif</text>
+          <text x="110" y="58" font-family="monospace" font-size="9" fill="#fca5a5">CIA verrou</text>
+        </svg>
+      </div>
+      <p style="font-size:12px">Le panneau propriétés du pupitre liste les raisons du conflit (ZP, ZEA, CIA, itinéraire incompatible).</p>
+    </div>
+    <div>
+      <h3>Itinéraire en transit progressif</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 200 80" style="background:#0f172a">
+          <!-- train -->
+          <g transform="translate(60,40)">
+            <ellipse cx="0" cy="0" rx="16" ry="9" fill="#22d3ee" opacity="0.12"/>
+            <polygon points="-11,-5 8,-5 13,0 8,5 -11,5" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+            <text x="-2" y="0" text-anchor="middle" dominant-baseline="central" fill="#22d3ee" font-size="7" font-family="monospace">12</text>
+          </g>
+          <!-- zone 1 cleared (no highlight) -->
+          <path d="M 10 40 Q 55 40 60 40" stroke="#e2e8f0" stroke-width="3" fill="none"/>
+          <!-- zone 2 still yellow -->
+          <path d="M 60 40 Q 120 40 190 40" stroke="#f59e0b" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 60 40 Q 120 40 190 40" stroke="#e2e8f0" stroke-width="3" fill="none"/>
+          <text x="20" y="62" font-family="monospace" font-size="8" fill="#334155">CDV1 libérée</text>
+          <text x="100" y="62" font-family="monospace" font-size="8" fill="#f59e0b">CDV2 transit</text>
+        </svg>
+      </div>
+      <p style="font-size:12px">Le transit se libère zone par zone au passage du train. La zone précédente reprend sa couleur normale.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     5. DESTRUCTION / DMT
+═══════════════════════════════════════════════════════════════ -->
+<section id="destruction">
+  <span class="section-tag">05 — Destruction</span>
+  <h2>Destruction d'itinéraire — Procédure DMT</h2>
+  <p>Quand un E.Ap (Espacement d'approche) est actif, la destruction normale est bloquée. La procédure DMT (Destruction Manuelle Temporisée) est requise.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Poser la FC (Fermeture de Contrôle)</div>
+        <div class="step-desc">Cliquer sur le bouton FC associé au signal d'entrée de l'itinéraire. Le bouton passe au rouge → le signal se ferme immédiatement.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">1er geste — Appuyer sur le bouton itinéraire</div>
+        <div class="step-desc">Le bouton passe en état <span class="badge" style="background:#1a1500;border:1px solid #ca8a04;font-size:10px"><span style="color:#fbbf24">ENREG.</span></span>. Le délai réglementaire (temps de constatation d'arrêt) démarre.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Attendre l'expiration du délai</div>
+        <div class="step-desc">Le compte à rebours s'affiche dans le panneau DMT du pupitre. Le bouton clignote en orange. Le 2e geste est bloqué jusqu'à 0:00.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">2e geste — Appuyer à nouveau sur le bouton</div>
+        <div class="step-desc">Annulation E.Ap, libération des aiguilles, destruction de l'itinéraire. Le bouton repasse à l'état IDLE.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn">Sans FC préalable, le 1er geste est inopérant et le panneau DMT l'indique clairement.</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     6. FC / ANNULATEURS
+═══════════════════════════════════════════════════════════════ -->
+<section id="fc">
+  <span class="section-tag">06 — FC / Annulateurs</span>
+  <h2>Fermetures de Contrôle et Annulateurs</h2>
+  <div class="cols">
+    <div>
+      <h3>Fermeture de Contrôle (FC)</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 200 140" style="background:#0f172a">
+          <!-- FC idle -->
+          <g transform="translate(50,70)">
+            <circle cx="0" cy="0" r="21" fill="#0d0a1a" stroke="#4a1d96" stroke-width="1.5"/>
+            <circle cx="0" cy="0" r="17" fill="#450a0a" stroke="#7c3aed" stroke-width="1"/>
+            <rect x="-3" y="-14" width="6" height="11" rx="3" fill="white"/>
+            <circle cx="0" cy="0" r="2.5" fill="#1a0a1a" stroke="white" stroke-width="0.8" opacity="0.6"/>
+          </g>
+          <text x="50" y="108" text-anchor="middle" font-family="monospace" font-size="8" fill="#7c3aed">FC idle (barre ↑)</text>
+          <!-- FC active -->
+          <g transform="translate(150,70)">
+            <circle cx="0" cy="0" r="21" fill="#0d0a1a" stroke="#4a1d96" stroke-width="1.5"/>
+            <circle cx="0" cy="0" r="17" fill="#b91c1c" stroke="#ef4444" stroke-width="1"/>
+            <rect x="-3" y="3" width="6" height="11" rx="3" fill="white"/>
+            <circle cx="0" cy="0" r="2.5" fill="#1a0a1a" stroke="white" stroke-width="0.8" opacity="0.6"/>
+          </g>
+          <text x="150" y="108" text-anchor="middle" font-family="monospace" font-size="8" fill="#ef4444">FC active (barre ↓)</text>
+          <text x="100" y="130" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Clic pour basculer</text>
+        </svg>
+      </div>
+      <p style="font-size:12px">La FC active empêche l'ouverture du signal même si un itinéraire valide l'utilise. Indispensable pour la procédure DMT.</p>
+    </div>
+    <div>
+      <h3>Annulateur de zone</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 200 140" style="background:#0f172a">
+          <!-- Track avec zone occupée -->
+          <path d="M 20 60 Q 100 60 180 60" stroke="#dc2626" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 20 60 Q 100 60 180 60" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <rect x="74" y="49" width="2" height="22" fill="#64748b" rx="1"/>
+          <rect x="80" y="49" width="2" height="22" fill="#64748b" rx="1"/>
+          <rect x="118" y="49" width="2" height="22" fill="#64748b" rx="1"/>
+          <rect x="124" y="49" width="2" height="22" fill="#64748b" rx="1"/>
+          <rect x="75" y="68" width="50" height="14" rx="3" fill="#dc262633" stroke="#dc2626" stroke-width="1"/>
+          <text x="100" y="75" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#dc2626" font-weight="700">CDV1</text>
+          <!-- Annulateur button active -->
+          <rect x="60" y="90" width="80" height="40" rx="4" fill="#422006" stroke="#f59e0b" stroke-width="2"/>
+          <text x="65" y="102" font-family="monospace" font-size="6" fill="#f59e0b">ANN</text>
+          <circle cx="100" cy="108" r="4" fill="#f59e0b" filter="url(#glow)"/>
+          <text x="100" y="125" text-anchor="middle" font-family="monospace" font-size="8" fill="#fcd34d">Ann.CDV1</text>
+          <!-- Arrow showing annulation -->
+          <text x="100" y="145" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">CDV1 neutralisée</text>
+        </svg>
+      </div>
+      <p style="font-size:12px">L'annulateur neutralise la détection d'occupation pour les zones configurées. Utile en cas de fausse occupation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     7. SIMULATION TRAIN
+═══════════════════════════════════════════════════════════════ -->
+<section id="simulation">
+  <span class="section-tag">07 — Simulation</span>
+  <h2>Simulation d'un train</h2>
+
+  <div class="diagram">
+    <div class="diagram-label">États du train et rendu TCO</div>
+    <svg viewBox="0 0 800 160" style="background:#0f172a">
+
+      <!-- Running -->
+      <rect x="10" y="10" width="185" height="140" rx="6" fill="#080e1a" stroke="#22d3ee" stroke-width="1"/>
+      <text x="102" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#22d3ee">En marche</text>
+      <path d="M 25 85 Q 102 85 178 85" stroke="#dc2626" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+      <path d="M 25 85 Q 102 85 178 85" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <g transform="translate(102,85)">
+        <ellipse cx="0" cy="0" rx="16" ry="9" fill="#22d3ee" opacity="0.12"/>
+        <polygon points="-11,-5 8,-5 13,0 8,5 -11,5" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="-2" y="0" text-anchor="middle" dominant-baseline="central" fill="#22d3ee" font-size="7" font-family="monospace" font-weight="bold">12</text>
+      </g>
+      <text x="102" y="120" text-anchor="middle" font-family="monospace" font-size="8" fill="#22d3ee">↔ Vitesse réglable</text>
+      <text x="102" y="135" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Zone = rouge occupé</text>
+
+      <!-- Waiting signal -->
+      <rect x="205" y="10" width="185" height="140" rx="6" fill="#080e1a" stroke="#f59e0b" stroke-width="1"/>
+      <text x="297" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#f59e0b">Attente signal</text>
+      <path d="M 220 85 Q 297 85 373 85" stroke="#dc2626" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+      <path d="M 220 85 Q 297 85 373 85" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <line x1="260" y1="85" x2="260" y2="69" stroke="#64748b" stroke-width="2"/>
+      <circle cx="260" cy="63" r="5" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="260" cy="63" r="3" fill="#ef4444"/>
+      <g transform="translate(240,85)">
+        <polygon points="-11,-5 8,-5 13,0 8,5 -11,5" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="-2" y="0" text-anchor="middle" dominant-baseline="central" fill="#f59e0b" font-size="7" font-family="monospace" font-weight="bold">12</text>
+      </g>
+      <text x="297" y="120" text-anchor="middle" font-family="monospace" font-size="8" fill="#f59e0b">Arrêté devant signal</text>
+      <text x="297" y="135" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Reprend si signal s'ouvre</text>
+
+      <!-- Blocked (derangement) -->
+      <rect x="400" y="10" width="185" height="140" rx="6" fill="#080e1a" stroke="#ef4444" stroke-width="1"/>
+      <text x="492" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#ef4444">Zone dérangement</text>
+      <path d="M 415 85 Q 492 85 568 85" stroke="#c2410c" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+      <path d="M 415 85 Q 492 85 568 85" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="461" y="76" width="62" height="14" rx="3" fill="#c2410c33" stroke="#c2410c" stroke-width="1"/>
+      <text x="492" y="83" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#f97316" font-weight="700">CDV2 !</text>
+      <text x="492" y="120" text-anchor="middle" font-family="monospace" font-size="8" fill="#ef4444">Orange = dérangement</text>
+      <text x="492" y="135" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Gris si annulé (EE)</text>
+
+      <!-- Terminated -->
+      <rect x="595" y="10" width="195" height="140" rx="6" fill="#080e1a" stroke="#334155" stroke-width="1"/>
+      <text x="692" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">Terminé</text>
+      <path d="M 610 85 Q 692 85 778 85" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <g transform="translate(692,85)">
+        <polygon points="-11,-5 8,-5 13,0 8,5 -11,5" fill="#0f172a" stroke="#475569" stroke-width="1.5"/>
+        <text x="-2" y="0" text-anchor="middle" dominant-baseline="central" fill="#475569" font-size="7" font-family="monospace">12</text>
+      </g>
+      <text x="692" y="120" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Hors service</text>
+      <text x="692" y="135" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">Supprimable via panel</text>
+    </svg>
+  </div>
+
+  <div class="info">Un train placé en mode <kbd>Train X</kbd> hérite automatiquement du sens défini par l'itinéraire actif sur le tronçon. Sa vitesse est réglable dans le panneau Simulation en bas du canvas.</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     8. DIAGNOSTIC
+═══════════════════════════════════════════════════════════════ -->
+<section id="diagnostic">
+  <span class="section-tag">08 — Diagnostic</span>
+  <h2>Boutons de Diagnostic</h2>
+  <p>Les boutons de diagnostic sont dans la section DIAGNOSTIC du pupitre. Ils fonctionnent en maintien : actifs tant que le clic est enfoncé.</p>
+
+  <div class="cols">
+    <div>
+      <h3>Test Zone</h3>
+      <div class="diagram">
+        <div class="diagram-label">Avant / Pendant le test</div>
+        <svg viewBox="0 0 360 160" style="background:#0f172a">
+          <!-- AVANT -->
+          <text x="90" y="18" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">Sans test</text>
+          <!-- tracks -->
+          <path d="M 20 70 Q 90 70 160 70" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M 20 110 Q 90 110 160 110" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- Zone band faint -->
+          <path d="M 20 70 Q 90 70 160 70" stroke="#3b82f6" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+          <path d="M 20 110 Q 90 110 160 110" stroke="#22c55e" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+          <!-- zone badges -->
+          <rect x="64" y="62" width="52" height="14" rx="3" fill="#3b82f633" stroke="#3b82f6" stroke-width="1"/>
+          <text x="90" y="69" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#3b82f6" font-weight="700">CDV1</text>
+          <rect x="64" y="103" width="52" height="14" rx="3" fill="#22c55e33" stroke="#22c55e" stroke-width="1"/>
+          <text x="90" y="110" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#22c55e" font-weight="700">CDV2</text>
+          <!-- bouton repos -->
+          <rect x="30" y="132" width="120" height="22" rx="3" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+          <circle cx="50" cy="143" r="3" fill="#0f172a"/>
+          <text x="110" y="147" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Test Zone</text>
+
+          <!-- separator -->
+          <line x1="180" y1="10" x2="180" y2="150" stroke="#1e3a5f" stroke-width="1"/>
+
+          <!-- PENDANT -->
+          <text x="270" y="18" text-anchor="middle" font-family="monospace" font-size="9" fill="#f59e0b">Pendant le test</text>
+          <!-- tracks with yellow highlight -->
+          <path d="M 200 70 Q 270 70 340 70" stroke="#f59e0b" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 200 70 Q 270 70 340 70" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M 200 110 Q 270 110 340 110" stroke="#f59e0b" stroke-width="10" fill="none" opacity="0.75" stroke-linecap="round"/>
+          <path d="M 200 110 Q 270 110 340 110" stroke="#e2e8f0" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <rect x="244" y="62" width="52" height="14" rx="3" fill="#f59e0b33" stroke="#f59e0b" stroke-width="1"/>
+          <text x="270" y="69" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#f59e0b" font-weight="700">CDV1</text>
+          <rect x="244" y="103" width="52" height="14" rx="3" fill="#f59e0b33" stroke="#f59e0b" stroke-width="1"/>
+          <text x="270" y="110" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="8" fill="#f59e0b" font-weight="700">CDV2</text>
+          <!-- bouton actif -->
+          <rect x="210" y="132" width="120" height="22" rx="3" fill="#422006" stroke="#f59e0b" stroke-width="2"/>
+          <circle cx="230" cy="143" r="3" fill="#f59e0b"/>
+          <text x="290" y="147" text-anchor="middle" font-family="monospace" font-size="8" fill="#fcd34d">Test Zone ●</text>
+        </svg>
+      </div>
+      <p style="font-size:12px">Toutes les zones libres (sans train, sans occupation manuelle, sans dérangement) s'illuminent en jaune. Relâcher remet l'affichage en état normal. <strong>Zones occupées et en dérangement sont exclues.</strong></p>
+    </div>
+
+    <div>
+      <h3>Test Aiguille</h3>
+      <div class="diagram">
+        <div class="diagram-label">Vue apprenant — branches cachées</div>
+        <svg viewBox="0 0 360 160" style="background:#0f172a">
+          <!-- SANS TEST -->
+          <text x="90" y="18" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">Sans test</text>
+          <line x1="20" y1="85" x2="75" y2="85" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round"/>
+          <!-- aiguille sans branches -->
+          <circle cx="75" cy="85" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+          <text x="75" y="107" text-anchor="middle" font-family="monospace" font-size="8" fill="#94a3b8">Aig1</text>
+          <text x="75" y="120" text-anchor="middle" font-family="monospace" font-size="7" fill="#334155">branches invisibles</text>
+          <!-- bouton repos -->
+          <rect x="20" y="132" width="130" height="22" rx="3" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+          <circle cx="40" cy="143" r="3" fill="#0f172a"/>
+          <text x="110" y="147" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">Test Aiguille</text>
+
+          <!-- separator -->
+          <line x1="180" y1="10" x2="180" y2="150" stroke="#1e3a5f" stroke-width="1"/>
+
+          <!-- AVEC TEST — branche active visible -->
+          <text x="270" y="18" text-anchor="middle" font-family="monospace" font-size="9" fill="#22c55e">Pendant le test</text>
+          <line x1="200" y1="85" x2="255" y2="85" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round"/>
+          <!-- aiguille avec branche active -->
+          <circle cx="255" cy="85" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+          <!-- branche directe active visible -->
+          <line x1="255" y1="85" x2="295" y2="85" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+          <!-- branche déviée invisible (grisée pour l'illustration) -->
+          <text x="255" y="107" text-anchor="middle" font-family="monospace" font-size="8" fill="#94a3b8">Aig1</text>
+          <text x="255" y="120" text-anchor="middle" font-family="monospace" font-size="7" fill="#22c55e">branche active confirmée</text>
+          <!-- bouton actif -->
+          <rect x="200" y="132" width="130" height="22" rx="3" fill="#0c2a1a" stroke="#22c55e" stroke-width="2"/>
+          <circle cx="220" cy="143" r="3" fill="#22c55e"/>
+          <text x="290" y="147" text-anchor="middle" font-family="monospace" font-size="8" fill="#4ade80">Test Aiguille ●</text>
+        </svg>
+      </div>
+      <p style="font-size:12px">En vue apprenant, les branches sont masquées par défaut. Le Test Aiguille révèle uniquement la branche dont le contrôle électrique est confirmé. <strong>En cas de discordance : aucune branche n'apparaît.</strong></p>
+    </div>
+  </div>
+
+  <h3>Injecter une discordance (vue formateur)</h3>
+  <p>Sélectionnez une aiguille sur le canvas. Dans le panneau Propriétés, cochez <strong>Discordance branche directe</strong> ou <strong>Discordance branche déviée</strong> pour simuler une perte de contrôle de position.</p>
+  <div class="diagram">
+    <svg viewBox="0 0 700 100" style="background:#0f172a">
+      <!-- Concordant -->
+      <rect x="10" y="10" width="200" height="80" rx="5" fill="#080e1a" stroke="#1e3a5f" stroke-width="1"/>
+      <text x="110" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#22c55e">Concordante</text>
+      <line x1="30" y1="60" x2="70" y2="60" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="70" cy="60" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+      <line x1="70" y1="60" x2="110" y2="60" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+      <line x1="70" y1="60" x2="105" y2="85" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <text x="110" y="88" text-anchor="middle" font-family="monospace" font-size="8" fill="#334155">position=straight OK</text>
+
+      <!-- Discordance straight -->
+      <rect x="220" y="10" width="220" height="80" rx="5" fill="#080e1a" stroke="#f97316" stroke-width="1"/>
+      <text x="330" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#f97316">Discordance branche directe</text>
+      <line x1="240" y1="60" x2="280" y2="60" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="280" cy="60" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+      <line x1="280" y1="60" x2="320" y2="60" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>
+      <line x1="280" y1="60" x2="315" y2="85" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <text x="330" y="88" text-anchor="middle" font-family="monospace" font-size="8" fill="#f97316">relais branche directe chuté</text>
+
+      <!-- Discordance double -->
+      <rect x="450" y="10" width="240" height="80" rx="5" fill="#080e1a" stroke="#ef4444" stroke-width="1"/>
+      <text x="570" y="30" text-anchor="middle" font-family="monospace" font-size="9" fill="#ef4444">Discordance totale</text>
+      <line x1="470" y1="60" x2="510" y2="60" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="510" cy="60" r="6" fill="#0f172a" stroke="#ef4444" stroke-width="2"/>
+      <line x1="510" y1="60" x2="550" y2="60" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>
+      <line x1="510" y1="60" x2="545" y2="85" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+      <text x="570" y="88" text-anchor="middle" font-family="monospace" font-size="8" fill="#ef4444">CIA sur tous itinéraires</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     9. VUE APPRENANT
+═══════════════════════════════════════════════════════════════ -->
+<section id="apprenant">
+  <span class="section-tag">09 — Apprenant</span>
+  <h2>Vue Apprenant</h2>
+  <p>La vue apprenant est accessible via le bouton <span class="highlight-box">Vue apprenant</span> dans la barre d'outils. Elle partage le même état que la vue formateur en temps réel.</p>
+
+  <div class="diagram">
+    <div class="diagram-label">Interface Vue Apprenant</div>
+    <svg viewBox="0 0 860 380" style="background:#0a0f1e">
+      <!-- Header -->
+      <rect x="0" y="0" width="860" height="32" fill="#080e1a"/>
+      <rect x="0" y="31" width="860" height="1" fill="#1e3a5f"/>
+      <text x="14" y="20" font-family="monospace" font-size="9" fill="#4a90d9" font-weight="700" letter-spacing="1">PRS SIMULATOR — VUE APPRENANT</text>
+      <rect x="758" y="8" width="90" height="18" rx="3" fill="transparent" stroke="#334155" stroke-width="1"/>
+      <text x="803" y="21" text-anchor="middle" font-family="monospace" font-size="8" fill="#475569">← Vue Formateur</text>
+
+      <!-- TCO Canvas (top, large) -->
+      <rect x="0" y="32" width="860" height="220" fill="#0a0f1e"/>
+      <!-- TCO content -->
+      <path d="M 200 140 Q 430 140 660 140" stroke="#3b82f6" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+      <path d="M 200 140 Q 430 140 660 140" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M 660 140 Q 720 140 780 140" stroke="#22c55e" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+      <path d="M 660 140 Q 720 140 780 140" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M 660 140 Q 710 178 760 215" stroke="#f97316" stroke-width="10" fill="none" opacity="0.22" stroke-linecap="round"/>
+      <path d="M 660 140 Q 710 178 760 215" stroke="#e2e8f0" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <!-- Nodes -->
+      <rect x="196" y="133" width="2" height="14" fill="#64748b" rx="1"/>
+      <rect x="202" y="133" width="2" height="14" fill="#64748b" rx="1"/>
+      <text x="199" y="160" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748b">A</text>
+      <!-- aiguille (branches cachées par défaut) -->
+      <circle cx="660" cy="140" r="6" fill="#0f172a" stroke="#4a90d9" stroke-width="1.5"/>
+      <text x="660" y="162" text-anchor="middle" font-family="monospace" font-size="8" fill="#94a3b8">Aig1</text>
+      <text x="660" y="174" text-anchor="middle" font-family="monospace" font-size="7" fill="#334155">branches masquées</text>
+      <!-- Zone badges -->
+      <rect x="398" y="131" width="64" height="16" rx="3" fill="#3b82f633" stroke="#3b82f6" stroke-width="1"/>
+      <text x="430" y="139" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#3b82f6" font-weight="700">CDV1</text>
+      <rect x="692" y="131" width="64" height="16" rx="3" fill="#22c55e33" stroke="#22c55e" stroke-width="1"/>
+      <text x="724" y="139" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-size="9" fill="#22c55e" font-weight="700">CDV2</text>
+      <!-- Signal fermé -->
+      <line x1="430" y1="140" x2="430" y2="120" stroke="#64748b" stroke-width="2"/>
+      <circle cx="430" cy="114" r="6" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="430" cy="114" r="4" fill="#ef4444"/>
+      <text x="430" y="104" text-anchor="middle" font-family="monospace" font-size="8" fill="#64748b">Sig1</text>
+
+      <!-- Resize handle -->
+      <rect x="0" y="252" width="860" height="8" fill="#0a0f1e"/>
+      <rect x="0" y="252" width="860" height="1" fill="#1e3a5f"/>
+      <rect x="0" y="259" width="860" height="1" fill="#1e3a5f"/>
+      <rect x="400" y="254" width="60" height="3" rx="2" fill="#334155"/>
+
+      <!-- Pupitre bas -->
+      <rect x="0" y="260" width="860" height="120" fill="#080e1a"/>
+      <text x="14" y="278" font-family="monospace" font-size="9" fill="#4a90d9" font-weight="700" letter-spacing="1">PUPITRE PRS</text>
+
+      <!-- Buttons in learner pupitre -->
+      <rect x="14" y="286" width="55" height="55" rx="4" fill="#1a3a1a" stroke="#16a34a" stroke-width="1.5"/>
+      <circle cx="41" cy="297" r="4" fill="#4ade80"/>
+      <text x="41" y="312" text-anchor="middle" font-family="monospace" font-size="8" fill="#4ade80">A→B</text>
+      <text x="41" y="324" text-anchor="middle" font-family="monospace" font-size="7" fill="#16a34a">ACTIF</text>
+
+      <rect x="75" y="286" width="55" height="55" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <circle cx="102" cy="297" r="4" fill="#0f172a"/>
+      <text x="102" y="312" text-anchor="middle" font-family="monospace" font-size="8" fill="#64748b">B→C</text>
+
+      <rect x="136" y="286" width="55" height="55" rx="4" fill="#422006" stroke="#d97706" stroke-width="1.5"/>
+      <circle cx="163" cy="297" r="4" fill="#f59e0b"/>
+      <text x="163" y="312" text-anchor="middle" font-family="monospace" font-size="8" fill="#fcd34d">C→D</text>
+      <text x="163" y="324" text-anchor="middle" font-family="monospace" font-size="7" fill="#d97706">FORM.</text>
+
+      <!-- Test buttons in toolbar of learner pupitre -->
+      <rect x="640" y="268" width="80" height="22" rx="3" fill="#0c1220" stroke="#1e293b" stroke-width="1"/>
+      <text x="680" y="283" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">Test Zone</text>
+      <rect x="726" y="268" width="100" height="22" rx="3" fill="#0c1220" stroke="#1e293b" stroke-width="1"/>
+      <text x="776" y="283" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">Test Aiguille</text>
+      <rect x="832" y="268" width="24" height="22" rx="3" fill="#0c1220" stroke="#1e293b" stroke-width="1"/>
+      <text x="844" y="283" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">⠿</text>
+
+      <!-- Labels -->
+      <text x="430" y="248" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">TCO (lecture seule — même état que le formateur)</text>
+      <text x="430" y="376" text-anchor="middle" font-family="monospace" font-size="8" fill="#4a90d9">Pupitre interactif — boutons configurés par le formateur</text>
+    </svg>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h3>Spécificités apprenant</h3>
+      <table>
+        <tr><th>Fonctionnalité</th><th>Comportement</th></tr>
+        <tr><td>TCO</td><td>Lecture seule — pas d'édition possible</td></tr>
+        <tr><td>Branches d'aiguilles</td><td>Masquées par défaut</td></tr>
+        <tr><td>Test Aiguille</td><td>Révèle la branche confirmée seulement</td></tr>
+        <tr><td>Boutons pupitre</td><td>Entièrement fonctionnels</td></tr>
+        <tr><td>Mode Arrangement</td><td>Repositionnement libre des boutons</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Mode Arrangement</h3>
+      <p style="font-size:12px">Le bouton <span class="highlight-box">⠿ Arranger</span> permet à l'apprenant de repositionner et redimensionner librement les boutons du pupitre. Il peut également ajouter des plaques de repérage (libellés blancs sur fond noir).</p>
+      <div class="info" style="margin-top:8px">Ce repositionnement est propre à la session et ne modifie pas la configuration formateur.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     RACCOURCIS
+═══════════════════════════════════════════════════════════════ -->
+<section id="shortcuts">
+  <span class="section-tag">Référence</span>
+  <h2>Raccourcis clavier</h2>
+  <div class="cols">
+    <table>
+      <tr><th>Raccourci</th><th>Action</th></tr>
+      <tr><td><kbd>V</kbd></td><td>Mode Sélection</td></tr>
+      <tr><td><kbd>Z</kbd></td><td>Mode Nœud</td></tr>
+      <tr><td><kbd>C</kbd></td><td>Mode Tronçon</td></tr>
+      <tr><td><kbd>W</kbd></td><td>Mode Zone CDV</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Mode Signal</td></tr>
+      <tr><td><kbd>A</kbd></td><td>Mode Aiguille</td></tr>
+      <tr><td><kbd>T</kbd></td><td>Mode Texte</td></tr>
+      <tr><td><kbd>X</kbd></td><td>Mode Train</td></tr>
+    </table>
+    <table>
+      <tr><th>Raccourci</th><th>Action</th></tr>
+      <tr><td><kbd>Suppr.</kbd></td><td>Supprimer l'objet sélectionné</td></tr>
+      <tr><td><kbd>Échap</kbd></td><td>Revenir en mode Sélection</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Annuler la dernière action</td></tr>
+      <tr><td>Molette</td><td>Zoom canvas</td></tr>
+      <tr><td>Molette (pupitre)</td><td>Zoom boutons pupitre</td></tr>
+      <tr><td>Bordure pupitre</td><td>Redimensionner le pupitre</td></tr>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<script>
+  // Active nav link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const links    = document.querySelectorAll('nav a[href^="#"]');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
