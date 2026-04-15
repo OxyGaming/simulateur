@@ -16,6 +16,8 @@ export async function GET(req: Request) {
         try { controller.enqueue(enc.encode(data)); } catch { /* client déconnecté */ }
       };
 
+      enqueue(': connected\n\n');
+
       syncHub.registerTrainerClient({ id: clientId, enqueue });
 
       const heartbeat = setInterval(() => enqueue(': heartbeat\n\n'), 20_000);

@@ -42,13 +42,25 @@ async function pushSnapshot(snapshot: SyncSnapshot) {
   }
 }
 
+// Intervalle de re-push forcé : garantit que les apprenants qui se connectent
+// en cours de session reçoivent un snapshot même si le store est statique.
+const KEEPALIVE_MS = 3_000;
+
 export function useSyncPublisher() {
-  const pendingRef = useRef(false);
-  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef   = useRef(false);
+  const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keepaliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Snapshot initial dès le montage (catch-up pour les apprenants déjà connectés)
+    // Snapshot initial dès le montage
     pushSnapshot(extractSnapshot());
+
+    // Re-push périodique (keepalive) : les apprenants qui se connectent
+    // après le montage reçoivent toujours l'état courant via lastSnapshot du hub,
+    // mais ce timer assure la mise à jour même si le store est complètement statique.
+    keepaliveRef.current = setInterval(() => {
+      pushSnapshot(extractSnapshot());
+    }, KEEPALIVE_MS);
 
     // Abonnement direct au store (hors React) — aucun re-render
     const unsub = useRailwayStore.subscribe(() => {
@@ -63,6 +75,7 @@ export function useSyncPublisher() {
     return () => {
       unsub();
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (keepaliveRef.current) clearInterval(keepaliveRef.current);
     };
   }, []);
 }

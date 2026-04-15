@@ -65,9 +65,12 @@ class SyncHub {
 
 // ─── Singleton résistant au hot-reload Next.js ────────────────────────────────
 // En dev, Next.js recharge les modules mais globalThis persiste dans le process.
+// On utilise ?? (et non instanceof) car en production Next.js peut bundler les
+// routes dans des chunks séparés : la référence à la classe SyncHub peut différer
+// selon le chunk, rendant instanceof faux même si l'objet est bien un SyncHub.
+// Le test ?? suffit : on vérifie uniquement l'existence de l'instance.
 
 const GLOBAL_KEY = '__prs_sync_hub__';
-export const syncHub: SyncHub =
-  (globalThis as Record<string, unknown>)[GLOBAL_KEY] instanceof SyncHub
-    ? (globalThis as Record<string, unknown>)[GLOBAL_KEY] as SyncHub
-    : ((globalThis as Record<string, unknown>)[GLOBAL_KEY] = new SyncHub());
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const g = globalThis as any;
+export const syncHub: SyncHub = g[GLOBAL_KEY] ?? (g[GLOBAL_KEY] = new SyncHub());

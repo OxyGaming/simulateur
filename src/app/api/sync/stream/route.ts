@@ -17,6 +17,10 @@ export async function GET(req: Request) {
         try { controller.enqueue(enc.encode(data)); } catch { /* client déconnecté */ }
       };
 
+      // Commentaire initial : force le flush des headers SSE vers le client
+      // (certains proxys/navigateurs n'envoient rien tant que le buffer est vide)
+      enqueue(': connected\n\n');
+
       syncHub.registerLearnerClient({ id: clientId, enqueue });
 
       // Heartbeat toutes les 20 s pour éviter les timeouts proxy/navigateur
