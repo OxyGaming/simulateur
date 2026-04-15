@@ -6,6 +6,8 @@ import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { PupitrePanel } from '@/components/PupitrePanel';
 import { SimulationPanel } from '@/components/SimulationPanel';
 import { useRailwayStore } from '@/store/useRailwayStore';
+import { useSyncPublisher } from '@/hooks/useSyncPublisher';
+import { useTrainerActionReceiver } from '@/hooks/useTrainerActionReceiver';
 
 const MIN_PUPITRE_W = 120;
 const MAX_PUPITRE_W = 520;
@@ -20,6 +22,9 @@ const STATUS_HINTS: Record<string, string> = {
 };
 
 export default function Page() {
+  useSyncPublisher();
+  useTrainerActionReceiver();
+
   const mode        = useRailwayStore(s => s.mode);
   const pendingEdge = useRailwayStore(s => s.pendingEdge);
   const undo        = useRailwayStore(s => s.undo);

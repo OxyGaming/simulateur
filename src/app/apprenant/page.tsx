@@ -3,12 +3,17 @@ import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { TcoCanvas } from '@/components/TcoCanvas';
 import { LearnerPupitreCanvas } from '@/components/LearnerPupitreCanvas';
+import { useSyncReceiver } from '@/hooks/useSyncReceiver';
+import { useLearnerActionPublisher } from '@/hooks/useLearnerActionPublisher';
 
 const MIN_PUPITRE_H = 120;
 const MAX_PUPITRE_H = 600;
 const DEFAULT_PUPITRE_H = 280;
 
 export default function ApprenantPage() {
+  const { status } = useSyncReceiver();
+  useLearnerActionPublisher();
+
   const [pupitreH, setPupitreH] = useState(DEFAULT_PUPITRE_H);
   const isDragging    = useRef(false);
   const startY        = useRef(0);
@@ -46,6 +51,22 @@ export default function ApprenantPage() {
           ← Vue Formateur
         </Link>
       </div>
+
+      {/* Bannière statut de connexion */}
+      {status !== 'connected' && (
+        <div style={{
+          background:  status === 'connecting' ? '#1c2a1c' : '#2a1c1c',
+          color:       status === 'connecting' ? '#4ade80' : '#fca5a5',
+          borderBottom: `1px solid ${status === 'connecting' ? '#166534' : '#7f1d1d'}`,
+          textAlign:   'center',
+          padding:     '4px 0',
+          fontSize:    11,
+          fontFamily:  'monospace',
+          flexShrink:  0,
+        }}>
+          {status === 'connecting' ? '⟳ Connexion au formateur…' : '✕ Connexion perdue — reconnexion en cours…'}
+        </div>
+      )}
 
       {/* TCO Canvas — haut */}
       <div style={layout.canvas}>
