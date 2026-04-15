@@ -1,34 +1,32 @@
-// GET /api/sync/stream — flux SSE pour les apprenants
-// Dès la connexion, le dernier snapshot est envoyé (rattrapage).
-// Ensuite, chaque broadcast du formateur est retransmis en temps réel.
+// GET /api/sync/stream?session=XXXX — flux SSE pour les apprenants
 import { syncHub } from '@/lib/syncHub';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const session = new URL(req.url).searchParams.get('session');
+  if (!session) return new Response('Missing ?session=', { status: 400 });
+
   const clientId = crypto.randomUUID();
 
   const stream = new ReadableStream({
     start(controller) {
       const enc = new TextEncoder();
-
       const enqueue = (data: string) => {
-        try { controller.enqueue(enc.encode(data)); } catch { /* client déconnecté */ }
+        try { controller.enqueue(enc.encode(data)); } catch { /* déconnecté */ }
       };
 
-      // Commentaire initial : force le flush des headers SSE vers le client
-      // (certains proxys/navigateurs n'envoient rien tant que le buffer est vide)
+      // Flush immédiat des headers SSE
       enqueue(': connected\n\n');
 
-      syncHub.registerLearnerClient({ id: clientId, enqueue });
+      syncHub.getSession(session).registerLearnerClient({ id: clientId, enqueue });
 
-      // Heartbeat toutes les 20 s pour éviter les timeouts proxy/navigateur
       const heartbeat = setInterval(() => enqueue(': heartbeat\n\n'), 20_000);
 
       req.signal.addEventListener('abort', () => {
         clearInterval(heartbeat);
-        syncHub.unregisterLearnerClient(clientId);
+        syncHub.getSession(session).unregisterLearnerClient(clientId);
         try { controller.close(); } catch { /* déjà fermé */ }
       });
     },

@@ -7,23 +7,24 @@ type SseClient = {
   enqueue: (data: string) => void;
 };
 
-// ─── Hub bidirectionnel ───────────────────────────────────────────────────────
+// ─── Session individuelle ─────────────────────────────────────────────────────
 
-class SyncHub {
-  // Clients apprenant — reçoivent les snapshots du formateur
+class SyncSession {
+  readonly code: string;
+
   private learnerClients = new Map<string, SseClient>();
-  // Clients formateur — reçoivent les actions de l'apprenant
   private trainerClients = new Map<string, SseClient>();
 
-  private lastSnapshot: SyncSnapshot | null = null;
-  private stateSeq     = 0;
-  private actionSeq    = 0;
+  lastSnapshot: SyncSnapshot | null = null;
+  private stateSeq  = 0;
+  private actionSeq = 0;
 
-  // ── Formateur → Apprenants ─────────────────────────────────────────────────
+  constructor(code: string) { this.code = code; }
+
+  // ── Formateur → Apprenants ───────────────────────────────────────────────
 
   registerLearnerClient(client: SseClient) {
     this.learnerClients.set(client.id, client);
-    // Envoi immédiat du dernier snapshot pour rattrapage
     if (this.lastSnapshot) {
       client.enqueue(
         `data: ${JSON.stringify({ seq: this.stateSeq, snapshot: this.lastSnapshot })}\n\n`,
@@ -31,44 +32,61 @@ class SyncHub {
     }
   }
 
-  unregisterLearnerClient(id: string) {
-    this.learnerClients.delete(id);
-  }
+  unregisterLearnerClient(id: string) { this.learnerClients.delete(id); }
 
   broadcastSnapshot(snapshot: SyncSnapshot) {
     this.lastSnapshot = snapshot;
     this.stateSeq++;
     const msg = `data: ${JSON.stringify({ seq: this.stateSeq, snapshot })}\n\n`;
-    for (const client of this.learnerClients.values()) {
-      client.enqueue(msg);
-    }
+    for (const c of this.learnerClients.values()) c.enqueue(msg);
   }
 
-  // ── Apprenants → Formateurs ────────────────────────────────────────────────
+  // ── Apprenants → Formateurs ──────────────────────────────────────────────
 
-  registerTrainerClient(client: SseClient) {
-    this.trainerClients.set(client.id, client);
-  }
-
-  unregisterTrainerClient(id: string) {
-    this.trainerClients.delete(id);
-  }
+  registerTrainerClient(client: SseClient) { this.trainerClients.set(client.id, client); }
+  unregisterTrainerClient(id: string)      { this.trainerClients.delete(id); }
 
   broadcastAction(action: LearnerAction) {
     this.actionSeq++;
     const msg = `data: ${JSON.stringify({ seq: this.actionSeq, action })}\n\n`;
-    for (const client of this.trainerClients.values()) {
-      client.enqueue(msg);
-    }
+    for (const c of this.trainerClients.values()) c.enqueue(msg);
+  }
+
+  get clientCount() {
+    return this.learnerClients.size + this.trainerClients.size;
   }
 }
 
+// ─── Gestionnaire de sessions ─────────────────────────────────────────────────
+
+class SyncHub {
+  private sessions = new Map<string, SyncSession>();
+
+  getSession(code: string): SyncSession {
+    let session = this.sessions.get(code);
+    if (!session) {
+      session = new SyncSession(code);
+      this.sessions.set(code, session);
+    }
+    return session;
+  }
+
+  /** Supprime les sessions sans aucun client connecté (nettoyage mémoire). */
+  cleanup() {
+    for (const [code, session] of this.sessions) {
+      if (session.clientCount === 0 && !session.lastSnapshot) {
+        this.sessions.delete(code);
+      }
+    }
+  }
+
+  get sessionCount() { return this.sessions.size; }
+}
+
 // ─── Singleton résistant au hot-reload Next.js ────────────────────────────────
-// En dev, Next.js recharge les modules mais globalThis persiste dans le process.
 // On utilise ?? (et non instanceof) car en production Next.js peut bundler les
-// routes dans des chunks séparés : la référence à la classe SyncHub peut différer
-// selon le chunk, rendant instanceof faux même si l'objet est bien un SyncHub.
-// Le test ?? suffit : on vérifie uniquement l'existence de l'instance.
+// routes dans des chunks séparés : la référence à la classe peut différer,
+// rendant instanceof faux même si l'objet est bien un SyncHub.
 
 const GLOBAL_KEY = '__prs_sync_hub__';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,57 +1,39 @@
 'use client';
 // useLearnerActionPublisher — côté APPRENANT
-// Observe les changements du store Zustand qui proviennent d'actions LOCALES
-// (i.e. pas d'une mise à jour distante du formateur).
-//
-// Actions détectées et transmises au formateur :
-//   • pressButton  → transition vers 'forming' d'un bouton
-//   • updateReflexion → changement de réflexion sur un bouton
-//
-// Le flag isRemoteUpdate() (posé par useSyncReceiver) garantit qu'on n'envoie
-// pas les mises à jour reçues du formateur comme si elles venaient de l'apprenant.
+// Détecte les actions locales (pressButton, updateReflexion) et les envoie au formateur.
 import { useEffect, useRef } from 'react';
 import { useRailwayStore } from '@/store/useRailwayStore';
 import { isRemoteUpdate } from './syncFlags';
 import type { LearnerAction } from '@/types/sync';
-import type { PanelButton as StorePanelButton } from '@/types/railway';
+import type { PanelButton } from '@/types/railway';
 
-async function sendAction(action: LearnerAction) {
+async function sendAction(sessionCode: string, action: LearnerAction) {
   try {
-    await fetch('/api/sync/action', {
+    await fetch(`/api/sync/action?session=${encodeURIComponent(sessionCode)}`, {
       method:    'POST',
       headers:   { 'Content-Type': 'application/json' },
       body:      JSON.stringify(action),
       keepalive: true,
     });
-  } catch {
-    // Erreur réseau silencieuse
-  }
+  } catch { /* erreur réseau silencieuse */ }
 }
 
-function reflexionsEqual(
-  a: StorePanelButton['reflexions'],
-  b: StorePanelButton['reflexions'],
-): boolean {
-  const ra = a ?? [];
-  const rb = b ?? [];
+function reflexionsEqual(a: PanelButton['reflexions'], b: PanelButton['reflexions']): boolean {
+  const ra = a ?? []; const rb = b ?? [];
   if (ra.length !== rb.length) return false;
   return ra.every((r, i) => r.slot === rb[i].slot && r.type === rb[i].type);
 }
 
-export function useLearnerActionPublisher() {
-  // On conserve la référence aux panelButtons précédents pour comparer
-  const prevButtonsRef = useRef<Record<string, StorePanelButton>>(
+export function useLearnerActionPublisher(sessionCode: string | null) {
+  const prevButtonsRef = useRef<Record<string, PanelButton>>(
     useRailwayStore.getState().panelButtons,
   );
 
   useEffect(() => {
+    if (!sessionCode) return;
+
     const unsub = useRailwayStore.subscribe((state) => {
-      // Si c'est une mise à jour distante (venue du formateur), on met à jour
-      // la baseline de comparaison sans envoyer d'action, et on sort.
-      if (isRemoteUpdate()) {
-        prevButtonsRef.current = state.panelButtons;
-        return;
-      }
+      if (isRemoteUpdate()) { prevButtonsRef.current = state.panelButtons; return; }
 
       const curr = state.panelButtons;
       const prev = prevButtonsRef.current;
@@ -59,30 +41,18 @@ export function useLearnerActionPublisher() {
       for (const id of Object.keys(curr)) {
         const currBtn = curr[id];
         const prevBtn = prev[id];
-        if (!prevBtn) continue; // bouton nouvellement créé (formateur), pas une action apprenant
+        if (!prevBtn) continue;
 
-        // Détection d'un pressButton : transition vers 'forming'
-        // (idle/conflict/registered/overregistered → forming)
-        if (
-          currBtn.state === 'forming' &&
-          prevBtn.state !== 'forming'
-        ) {
-          sendAction({ type: 'pressButton', buttonId: id });
+        if (currBtn.state === 'forming' && prevBtn.state !== 'forming') {
+          sendAction(sessionCode, { type: 'pressButton', buttonId: id });
         }
-
-        // Détection d'un changement de réflexion
         if (!reflexionsEqual(currBtn.reflexions, prevBtn.reflexions)) {
-          sendAction({
-            type:       'updateReflexion',
-            buttonId:   id,
-            reflexions: currBtn.reflexions ?? [],
-          });
+          sendAction(sessionCode, { type: 'updateReflexion', buttonId: id, reflexions: currBtn.reflexions ?? [] });
         }
       }
-
       prevButtonsRef.current = curr;
     });
 
     return () => unsub();
-  }, []);
+  }, [sessionCode]);
 }

@@ -1,10 +1,6 @@
 'use client';
 // useSyncReceiver — côté APPRENANT
-// Ouvre une connexion SSE vers /api/sync/stream.
-// Chaque snapshot reçu est appliqué directement au store Zustand local
-// via setState (merge partiel — les actions/méthodes du store ne sont pas touchées).
-// Le flag markRemoteUpdate() empêche useLearnerActionPublisher de renvoyer
-// ces mises à jour distantes comme si elles venaient de l'apprenant.
+// Ouvre une connexion SSE et applique les snapshots du formateur au store local.
 import { useEffect, useRef, useState } from 'react';
 import { useRailwayStore } from '@/store/useRailwayStore';
 import { markRemoteUpdate } from './syncFlags';
@@ -16,12 +12,14 @@ const RECONNECT_FACTOR  = 1.5;
 
 export type SyncStatus = 'connecting' | 'connected' | 'disconnected';
 
-export function useSyncReceiver() {
+export function useSyncReceiver(sessionCode: string | null) {
   const [status, setStatus] = useState<SyncStatus>('connecting');
-  const lastSeqRef  = useRef(-1);
+  const lastSeqRef   = useRef(-1);
   const destroyedRef = useRef(false);
 
   useEffect(() => {
+    if (!sessionCode) return;
+
     destroyedRef.current = false;
     let es: EventSource | null = null;
     let delay = RECONNECT_BASE_MS;
@@ -30,12 +28,9 @@ export function useSyncReceiver() {
     function connect() {
       if (destroyedRef.current) return;
       setStatus('connecting');
-      es = new EventSource('/api/sync/stream');
+      es = new EventSource(`/api/sync/stream?session=${encodeURIComponent(sessionCode)}`);
 
-      es.onopen = () => {
-        delay = RECONNECT_BASE_MS;
-        setStatus('connected');
-      };
+      es.onopen = () => { delay = RECONNECT_BASE_MS; setStatus('connected'); };
 
       es.onmessage = (event: MessageEvent<string>) => {
         let parsed: SyncStateEvent;
@@ -43,22 +38,15 @@ export function useSyncReceiver() {
         catch { return; }
 
         if (lastSeqRef.current !== -1 && parsed.seq !== lastSeqRef.current + 1) {
-          console.warn(
-            `[SSE état] écart de séquence : attendu ${lastSeqRef.current + 1}, reçu ${parsed.seq}`,
-          );
+          console.warn(`[SSE] écart séquence : attendu ${lastSeqRef.current + 1}, reçu ${parsed.seq}`);
         }
         lastSeqRef.current = parsed.seq;
 
-        // Applique le snapshot au store local de l'apprenant.
-        // Le flag évite que useLearnerActionPublisher ne renvoie ces changements.
-        markRemoteUpdate(() => {
-          useRailwayStore.setState(parsed.snapshot);
-        });
+        markRemoteUpdate(() => { useRailwayStore.setState(parsed.snapshot); });
       };
 
       es.onerror = () => {
-        es?.close();
-        es = null;
+        es?.close(); es = null;
         if (!destroyedRef.current) {
           setStatus('disconnected');
           reconnectTimer = setTimeout(() => {
@@ -76,7 +64,7 @@ export function useSyncReceiver() {
       es?.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
     };
-  }, []);
+  }, [sessionCode]);
 
   return { status };
 }

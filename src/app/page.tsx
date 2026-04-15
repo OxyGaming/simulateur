@@ -9,8 +9,8 @@ import { useRailwayStore } from '@/store/useRailwayStore';
 import { useSyncPublisher } from '@/hooks/useSyncPublisher';
 import { useTrainerActionReceiver } from '@/hooks/useTrainerActionReceiver';
 
-const MIN_PUPITRE_W = 120;
-const MAX_PUPITRE_W = 520;
+const MIN_PUPITRE_W     = 120;
+const MAX_PUPITRE_W     = 520;
 const DEFAULT_PUPITRE_W = 220;
 
 const STATUS_HINTS: Record<string, string> = {
@@ -21,19 +21,52 @@ const STATUS_HINTS: Record<string, string> = {
   addTrain:  'Cliquez sur un tronçon pour placer le train',
 };
 
-export default function Page() {
-  useSyncPublisher();
-  useTrainerActionReceiver();
+/** Génère un code session de 4 caractères sans ambiguïté visuelle. */
+function generateCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
+const STORAGE_KEY = 'prs-session-code';
+
+export default function Page() {
   const mode        = useRailwayStore(s => s.mode);
   const pendingEdge = useRailwayStore(s => s.pendingEdge);
   const undo        = useRailwayStore(s => s.undo);
 
+  // ── Code de session ────────────────────────────────────────────────────────
+  const [sessionCode, setSessionCode] = useState<string | null>(null);
+  const [copied, setCopied]           = useState(false);
+
+  useEffect(() => {
+    let code = localStorage.getItem(STORAGE_KEY);
+    if (!code) { code = generateCode(); localStorage.setItem(STORAGE_KEY, code); }
+    setSessionCode(code);
+  }, []);
+
+  function renewSession() {
+    const code = generateCode();
+    localStorage.setItem(STORAGE_KEY, code);
+    setSessionCode(code);
+  }
+
+  function copyLearnerLink() {
+    if (!sessionCode) return;
+    const url = `${window.location.origin}/apprenant?session=${sessionCode}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  useSyncPublisher(sessionCode);
+  useTrainerActionReceiver(sessionCode);
+
   // ── Resizable pupitre width ────────────────────────────────────────────────
   const [pupitreW, setPupitreW] = useState(DEFAULT_PUPITRE_W);
-  const dragging  = useRef(false);
-  const startX    = useRef(0);
-  const startW    = useRef(DEFAULT_PUPITRE_W);
+  const dragging = useRef(false);
+  const startX   = useRef(0);
+  const startW   = useRef(DEFAULT_PUPITRE_W);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -50,63 +83,49 @@ export default function Page() {
   // ── Ctrl+Z ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [undo]);
 
-  const edgeHint = mode === 'addEdge'
-    ? pendingEdge
-      ? 'Cliquez sur le nœud de destination — Échap pour annuler'
-      : 'Cliquez sur le nœud de départ'
-    : null;
-
+  const edgeHint   = mode === 'addEdge' ? (pendingEdge ? 'Cliquez sur le nœud de destination — Échap pour annuler' : 'Cliquez sur le nœud de départ') : null;
   const statusHint = edgeHint ?? STATUS_HINTS[mode] ?? null;
 
   return (
     <div style={layout.root}>
       <Toolbar />
+
+      {/* Bannière session */}
+      <div style={layout.sessionBar}>
+        <span style={layout.sessionLabel}>SESSION</span>
+        <span style={layout.sessionCode}>{sessionCode ?? '…'}</span>
+        <button style={layout.sessionBtn} onClick={copyLearnerLink} title="Copier le lien apprenant">
+          {copied ? '✓ Copié !' : '⎘ Lien apprenant'}
+        </button>
+        <button style={{ ...layout.sessionBtn, color: '#64748b' }} onClick={renewSession} title="Générer un nouveau code">
+          ↺ Nouveau code
+        </button>
+      </div>
+
       <div style={layout.workspace}>
-        {/* Pupitre PRS — panneau gauche */}
         <PupitrePanel width={pupitreW} />
 
-        {/* Drag handle */}
         <div
-          onMouseDown={(e) => {
-            dragging.current = true;
-            startX.current = e.clientX;
-            startW.current = pupitreW;
-            e.preventDefault();
-          }}
-          style={{
-            width: 5,
-            cursor: 'col-resize',
-            background: '#1e3a5f',
-            flexShrink: 0,
-            transition: 'background 0.15s',
-          }}
+          onMouseDown={(e) => { dragging.current = true; startX.current = e.clientX; startW.current = pupitreW; e.preventDefault(); }}
+          style={{ width: 5, cursor: 'col-resize', background: '#1e3a5f', flexShrink: 0, transition: 'background 0.15s' }}
           onMouseEnter={e => (e.currentTarget.style.background = '#3b82f6')}
           onMouseLeave={e => (e.currentTarget.style.background = '#1e3a5f')}
         />
 
-        {/* Canvas */}
         <div style={layout.canvas}>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             <TcoCanvas />
-            {statusHint && (
-              <div style={layout.toast}>
-                {statusHint}
-              </div>
-            )}
+            {statusHint && <div style={layout.toast}>{statusHint}</div>}
           </div>
           <SimulationPanel />
         </div>
 
-        {/* Properties */}
         <PropertiesPanel />
       </div>
     </div>
@@ -115,38 +134,40 @@ export default function Page() {
 
 const layout: Record<string, React.CSSProperties> = {
   root: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100vh',
-    background: '#0a0f1e',
-    color: 'white',
+    display: 'flex', flexDirection: 'column', height: '100vh',
+    background: '#0a0f1e', color: 'white',
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
-  workspace: {
-    display: 'flex',
-    flex: 1,
-    overflow: 'hidden',
+  sessionBar: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '4px 14px',
+    background: '#080e1a',
+    borderBottom: '1px solid #1e3a5f',
+    flexShrink: 0,
   },
-  canvas: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
+  sessionLabel: {
+    fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
+    letterSpacing: 2, color: '#475569', textTransform: 'uppercase' as const,
   },
+  sessionCode: {
+    fontSize: 18, fontFamily: 'monospace', fontWeight: 700,
+    letterSpacing: 6, color: '#38bdf8',
+    background: '#0f172a', border: '1px solid #1e3a5f',
+    padding: '2px 10px', borderRadius: 4,
+    minWidth: 70, textAlign: 'center' as const,
+  },
+  sessionBtn: {
+    fontSize: 11, fontFamily: 'monospace',
+    background: 'transparent', border: '1px solid #334155',
+    color: '#38bdf8', cursor: 'pointer', padding: '3px 10px', borderRadius: 4,
+  },
+  workspace: { display: 'flex', flex: 1, overflow: 'hidden' },
+  canvas: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   toast: {
-    position: 'absolute',
-    bottom: 20,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    background: 'rgba(15, 23, 42, 0.9)',
-    border: '1px solid #334155',
-    color: '#94a3b8',
-    padding: '6px 16px',
-    borderRadius: 20,
-    fontSize: 12,
-    fontFamily: 'monospace',
-    pointerEvents: 'none',
-    whiteSpace: 'nowrap',
-    backdropFilter: 'blur(4px)',
+    position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+    background: 'rgba(15, 23, 42, 0.9)', border: '1px solid #334155',
+    color: '#94a3b8', padding: '6px 16px', borderRadius: 20,
+    fontSize: 12, fontFamily: 'monospace', pointerEvents: 'none' as const,
+    whiteSpace: 'nowrap', backdropFilter: 'blur(4px)',
   },
 };

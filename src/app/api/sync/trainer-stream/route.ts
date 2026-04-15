@@ -1,30 +1,31 @@
-// GET /api/sync/trainer-stream — flux SSE pour les formateurs
-// Chaque action soumise par un apprenant est retransmise en temps réel.
+// GET /api/sync/trainer-stream?session=XXXX — flux SSE pour les formateurs
 import { syncHub } from '@/lib/syncHub';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const session = new URL(req.url).searchParams.get('session');
+  if (!session) return new Response('Missing ?session=', { status: 400 });
+
   const clientId = crypto.randomUUID();
 
   const stream = new ReadableStream({
     start(controller) {
       const enc = new TextEncoder();
-
       const enqueue = (data: string) => {
-        try { controller.enqueue(enc.encode(data)); } catch { /* client déconnecté */ }
+        try { controller.enqueue(enc.encode(data)); } catch { /* déconnecté */ }
       };
 
       enqueue(': connected\n\n');
 
-      syncHub.registerTrainerClient({ id: clientId, enqueue });
+      syncHub.getSession(session).registerTrainerClient({ id: clientId, enqueue });
 
       const heartbeat = setInterval(() => enqueue(': heartbeat\n\n'), 20_000);
 
       req.signal.addEventListener('abort', () => {
         clearInterval(heartbeat);
-        syncHub.unregisterTrainerClient(clientId);
+        syncHub.getSession(session).unregisterTrainerClient(clientId);
         try { controller.close(); } catch { /* déjà fermé */ }
       });
     },
