@@ -31,6 +31,8 @@ echo ""
 
 # ── 3. Build de production ────────────────────────────────────────────────────
 echo "▶ [3/4] Build de production (next build)..."
+# Suppression du cache Next.js pour forcer un build propre
+rm -rf .next
 npm run build
 echo "   ✓ Build réussi"
 echo ""
