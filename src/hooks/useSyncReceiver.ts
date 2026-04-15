@@ -28,7 +28,7 @@ export function useSyncReceiver(sessionCode: string | null) {
     function connect() {
       if (destroyedRef.current) return;
       setStatus('connecting');
-      es = new EventSource(`/api/sync/stream?session=${encodeURIComponent(sessionCode)}`);
+      es = new EventSource(`/api/sync/stream?session=${encodeURIComponent(sessionCode!)}`);
 
       es.onopen = () => { delay = RECONNECT_BASE_MS; setStatus('connected'); };
 

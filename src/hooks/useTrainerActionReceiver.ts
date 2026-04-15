@@ -23,7 +23,7 @@ export function useTrainerActionReceiver(sessionCode: string | null) {
 
     function connect() {
       if (destroyedRef.current) return;
-      es = new EventSource(`/api/sync/trainer-stream?session=${encodeURIComponent(sessionCode)}`);
+      es = new EventSource(`/api/sync/trainer-stream?session=${encodeURIComponent(sessionCode!)}`);
 
       es.onopen = () => { delay = RECONNECT_BASE_MS; };
 
