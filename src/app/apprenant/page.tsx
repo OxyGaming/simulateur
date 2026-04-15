@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 import { useRef, useState, useEffect } from 'react';
 import { TcoCanvas } from '@/components/TcoCanvas';
 import { LearnerPupitreCanvas } from '@/components/LearnerPupitreCanvas';
