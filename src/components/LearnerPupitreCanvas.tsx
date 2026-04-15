@@ -149,7 +149,7 @@ function EditableLabel({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function LearnerPupitreCanvas() {
+export function LearnerPupitreCanvas({ disableActivation = false }: { disableActivation?: boolean } = {}) {
   const panelButtons          = useRailwayStore(s => s.panelButtons);
   const pupitreLabels         = useRailwayStore(s => s.pupitreLabels);
   const blinkPhase            = useRailwayStore(s => s.blinkPhase);
@@ -174,7 +174,14 @@ export function LearnerPupitreCanvas() {
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // ── Activation timer (mirrors PupitrePanel) ────────────────────────────────
+  // En mode synchronisé (disableActivation=true), c'est le formateur qui gère
+  // le timer via PupitrePanel et diffuse le résultat — on évite le double timer.
   useEffect(() => {
+    if (disableActivation) {
+      // Annuler tout timer en cours si on passe en mode sync
+      Object.keys(timersRef.current).forEach(id => { clearTimeout(timersRef.current[id]); delete timersRef.current[id]; });
+      return;
+    }
     const formingIds = new Set(
       Object.values(panelButtons)
         .filter(b => b.state === 'forming' && b.type !== 'fc')
@@ -188,7 +195,7 @@ export function LearnerPupitreCanvas() {
         timersRef.current[id] = setTimeout(() => { delete timersRef.current[id]; activateButton(id); }, ACTIVATION_DELAY);
       }
     });
-  }, [panelButtons, activateButton]);
+  }, [panelButtons, activateButton, disableActivation]);
 
   // ── Blink timer ────────────────────────────────────────────────────────────
   const hasForming = Object.values(panelButtons).some(

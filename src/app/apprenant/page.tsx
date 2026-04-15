@@ -125,7 +125,7 @@ export default function ApprenantPage() {
       </div>
 
       <div style={{ height: pupitreH, flexShrink: 0, overflow: 'hidden' }}>
-        <LearnerPupitreCanvas />
+        <LearnerPupitreCanvas disableActivation={!!sessionCode} />
       </div>
     </div>
   );
