@@ -1,9 +1,10 @@
 'use client';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { TcoCanvas } from '@/components/TcoCanvas';
 import { LearnerPupitreCanvas } from '@/components/LearnerPupitreCanvas';
 import { useSyncReceiver } from '@/hooks/useSyncReceiver';
 import { useLearnerActionPublisher } from '@/hooks/useLearnerActionPublisher';
+import type { LearnerAction } from '@/types/sync';
 
 const MIN_PUPITRE_H     = 120;
 const MAX_PUPITRE_H     = 600;
@@ -34,6 +35,21 @@ export default function ApprenantPage() {
 
   const { status } = useSyncReceiver(sessionCode);
   useLearnerActionPublisher(sessionCode);
+
+  // ── Direct action sender (bypasse le store local) ─────────────────────────
+  const sendDirectAction = useCallback((action: LearnerAction) => {
+    if (!sessionCode) return;
+    fetch(`/api/sync/action?session=${encodeURIComponent(sessionCode)}`, {
+      method:    'POST',
+      headers:   { 'Content-Type': 'application/json' },
+      body:      JSON.stringify(action),
+      keepalive: true,
+    }).catch(() => {});
+  }, [sessionCode]);
+
+  const handleSyncButtonPress = useCallback((buttonId: string) => {
+    sendDirectAction({ type: 'pressButton', buttonId });
+  }, [sendDirectAction]);
 
   // ── Resize pupitre ─────────────────────────────────────────────────────────
   const [pupitreH, setPupitreH] = useState(DEFAULT_PUPITRE_H);
@@ -125,7 +141,10 @@ export default function ApprenantPage() {
       </div>
 
       <div style={{ height: pupitreH, flexShrink: 0, overflow: 'hidden' }}>
-        <LearnerPupitreCanvas disableActivation={!!sessionCode} />
+        <LearnerPupitreCanvas
+          disableActivation={!!sessionCode}
+          onSyncButtonPress={sessionCode ? handleSyncButtonPress : undefined}
+        />
       </div>
     </div>
   );

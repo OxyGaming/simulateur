@@ -149,7 +149,14 @@ function EditableLabel({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function LearnerPupitreCanvas({ disableActivation = false }: { disableActivation?: boolean } = {}) {
+export function LearnerPupitreCanvas({
+  disableActivation  = false,
+  onSyncButtonPress,
+}: {
+  disableActivation?:  boolean;
+  /** En mode synchronisé : appelé à la place du pressButton local. */
+  onSyncButtonPress?:  (buttonId: string) => void;
+} = {}) {
   const panelButtons          = useRailwayStore(s => s.panelButtons);
   const pupitreLabels         = useRailwayStore(s => s.pupitreLabels);
   const blinkPhase            = useRailwayStore(s => s.blinkPhase);
@@ -219,6 +226,17 @@ export function LearnerPupitreCanvas({ disableActivation = false }: { disableAct
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
+
+  // ── Button click : local ou direct-vers-formateur ─────────────────────────
+  // En mode synchronisé on NE modifie PAS le store local : on envoie directement
+  // l'action au formateur et on attend son snapshot pour mettre à jour l'affichage.
+  // Cela évite qu'un snapshot périmé du formateur (keepalive) écrase l'état
+  // 'forming' local et incite l'utilisateur à recliquer → double pressButton →
+  // annulation involontaire de l'itinéraire côté formateur.
+  function handleButtonClick(buttonId: string) {
+    if (onSyncButtonPress) { onSyncButtonPress(buttonId); }
+    else                   { pressButton(buttonId); }
+  }
 
   // Reflexion cycling (same as PupitrePanel)
   function cycleReflexion(btnId: string, slot: number) {
@@ -392,7 +410,7 @@ export function LearnerPupitreCanvas({ disableActivation = false }: { disableAct
               {isFC ? (
                 /* ── FC rotary knob ── */
                 <button
-                  onClick={arrangeMode ? undefined : () => pressButton(btn.id)}
+                  onClick={arrangeMode ? undefined : () => handleButtonClick(btn.id)}
                   style={{
                     width: '100%', height: '100%',
                     background: 'transparent', border: 'none',
@@ -431,7 +449,7 @@ export function LearnerPupitreCanvas({ disableActivation = false }: { disableAct
               ) : (
                 /* ── Standard / ANN button ── */
                 <button
-                  onClick={arrangeMode ? undefined : () => pressButton(btn.id)}
+                  onClick={arrangeMode ? undefined : () => handleButtonClick(btn.id)}
                   style={{
                     width: '100%', height: '100%',
                     background: colors.bg,
