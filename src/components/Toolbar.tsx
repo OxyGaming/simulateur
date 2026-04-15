@@ -116,7 +116,14 @@ const NOTIF_STYLES: Record<NotifType, React.CSSProperties> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function Toolbar() {
+interface ToolbarProps {
+  sessionCode?:  string | null;
+  onCopyLink?:   () => void;
+  onRenewCode?:  () => void;
+  linkCopied?:   boolean;
+}
+
+export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: ToolbarProps = {}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [notif, setNotif] = useState<Notif | null>(null);
 
@@ -202,9 +209,25 @@ export function Toolbar() {
           ? Aide
         </a>
 
-        <Link href="/apprenant" style={styles.btnApprenant} title="Ouvrir la vue apprenant">
-          Vue apprenant
-        </Link>
+        {/* Session code + lien apprenant */}
+        {sessionCode && (
+          <>
+            <div style={styles.separator} />
+            <span style={styles.sessionLabel}>SESSION</span>
+            <span style={styles.sessionCode}>{sessionCode}</span>
+            <button style={styles.btnCopyLink} onClick={onCopyLink} title="Copier le lien apprenant">
+              {linkCopied ? '✓ Copié !' : '⎘ Lien apprenant'}
+            </button>
+            <button style={styles.btnRenew} onClick={onRenewCode} title="Générer un nouveau code de session">
+              ↺
+            </button>
+          </>
+        )}
+        {!sessionCode && (
+          <Link href="/apprenant" style={styles.btnApprenant} title="Ouvrir la vue apprenant">
+            Vue apprenant
+          </Link>
+        )}
 
         <button onClick={handleExport} style={styles.btnSecondary} title="Exporter en JSON">
           ↓ Exporter
@@ -241,6 +264,10 @@ const styles: Record<string, React.CSSProperties> = {
   btnSecondary: { padding: '5px 10px', background: 'transparent', color: '#64748b', border: '1px solid #334155', borderRadius: 5, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' },
   btnHelp: { padding: '5px 10px', background: 'transparent', color: '#64748b', border: '1px solid #334155', borderRadius: 5, fontSize: 12, whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' },
   btnApprenant: { padding: '5px 10px', background: '#0c1f3a', color: '#60a5fa', border: '1px solid #1e4d8c', borderRadius: 5, fontSize: 12, whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' },
+  sessionLabel: { fontSize: 9, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2, color: '#475569', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' },
+  sessionCode: { fontSize: 15, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 5, color: '#38bdf8', background: '#0f172a', border: '1px solid #1e3a5f', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap' },
+  btnCopyLink: { padding: '5px 12px', background: '#0c2a3a', color: '#38bdf8', border: '1px solid #0e4d6e', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap' },
+  btnRenew: { padding: '5px 8px', background: 'transparent', color: '#475569', border: '1px solid #334155', borderRadius: 5, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' },
   hint: { color: '#334155', fontSize: 11, fontFamily: 'monospace', whiteSpace: 'nowrap' },
   notif: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 14px', fontSize: 12, fontFamily: 'monospace' },
   notifClose: { background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', opacity: 0.6, fontSize: 12, padding: '0 0 0 12px' },

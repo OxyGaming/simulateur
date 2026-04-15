@@ -94,19 +94,12 @@ export default function Page() {
 
   return (
     <div style={layout.root}>
-      <Toolbar />
-
-      {/* Bannière session */}
-      <div style={layout.sessionBar}>
-        <span style={layout.sessionLabel}>SESSION</span>
-        <span style={layout.sessionCode}>{sessionCode ?? '…'}</span>
-        <button style={layout.sessionBtn} onClick={copyLearnerLink} title="Copier le lien apprenant">
-          {copied ? '✓ Copié !' : '⎘ Lien apprenant'}
-        </button>
-        <button style={{ ...layout.sessionBtn, color: '#64748b' }} onClick={renewSession} title="Générer un nouveau code">
-          ↺ Nouveau code
-        </button>
-      </div>
+      <Toolbar
+        sessionCode={sessionCode}
+        onCopyLink={copyLearnerLink}
+        onRenewCode={renewSession}
+        linkCopied={copied}
+      />
 
       <div style={layout.workspace}>
         <PupitrePanel width={pupitreW} />
@@ -137,29 +130,6 @@ const layout: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', height: '100vh',
     background: '#0a0f1e', color: 'white',
     fontFamily: 'system-ui, -apple-system, sans-serif',
-  },
-  sessionBar: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '4px 14px',
-    background: '#080e1a',
-    borderBottom: '1px solid #1e3a5f',
-    flexShrink: 0,
-  },
-  sessionLabel: {
-    fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
-    letterSpacing: 2, color: '#475569', textTransform: 'uppercase' as const,
-  },
-  sessionCode: {
-    fontSize: 18, fontFamily: 'monospace', fontWeight: 700,
-    letterSpacing: 6, color: '#38bdf8',
-    background: '#0f172a', border: '1px solid #1e3a5f',
-    padding: '2px 10px', borderRadius: 4,
-    minWidth: 70, textAlign: 'center' as const,
-  },
-  sessionBtn: {
-    fontSize: 11, fontFamily: 'monospace',
-    background: 'transparent', border: '1px solid #334155',
-    color: '#38bdf8', cursor: 'pointer', padding: '3px 10px', borderRadius: 4,
   },
   workspace: { display: 'flex', flex: 1, overflow: 'hidden' },
   canvas: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
