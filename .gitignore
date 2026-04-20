@@ -10,3 +10,4 @@ drizzle/meta/_journal.json.bak
 
 # Docker Compose override local (dev / smoke tests) — ne doit PAS aller en prod.
 docker-compose.override.yml
+cookies.txt
