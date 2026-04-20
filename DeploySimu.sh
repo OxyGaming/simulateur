@@ -53,8 +53,13 @@ echo "   ✓ Code mis à jour"
 echo ""
 
 # ── 2. Dépendances (npm ci : lock strict, wipe node_modules) ─────────────────
-echo "▶ [2/5] Installation des dépendances (npm ci)..."
-npm ci --prefer-offline --no-audit --no-fund
+# --include=dev : on FORCE l'installation des devDependencies, même si
+# NODE_ENV=production est défini dans .env (sourcé juste au-dessus).
+# TypeScript, @types/*, eslint sont en devDeps mais indispensables pour que
+# `next build` lise next.config.ts et fasse le typecheck+lint. Sans ça, le
+# build crashe sur "Cannot find module 'typescript'".
+echo "▶ [2/5] Installation des dépendances (npm ci --include=dev)..."
+npm ci --include=dev --prefer-offline --no-audit --no-fund
 echo "   ✓ Dépendances OK"
 echo ""
 
