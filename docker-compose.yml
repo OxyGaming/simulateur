@@ -1,0 +1,88 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Simulateur PRS — stack de production self-hosted.
+#
+#   caddy      : reverse proxy HTTPS automatique (Let's Encrypt) → app:3000
+#   app        : Next.js standalone + SQLite (better-sqlite3)
+#   litestream : réplication continue SQLite vers /backups (+ S3 optionnel)
+#
+# Volumes :
+#   app-data    : base SQLite (app.db + WAL + SHM) — partagé app ↔ litestream
+#   app-backups : snapshots Litestream (réplica local file:) — utile même
+#                 si on ajoute un réplica S3 hors-host.
+#   caddy-data  : certificats TLS générés par Caddy (à préserver !)
+#   caddy-config: état Caddy (cluster ID, etc.)
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: prs-simulateur:latest
+    container_name: prs-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: file:/data/app.db
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required, ≥ 32 chars}
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL is required, e.g. https://prs.mondomaine.fr}
+    volumes:
+      - app-data:/data
+    networks:
+      - prs-net
+    # Le conteneur n'expose aucun port hôte — seul Caddy est public.
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: prs-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      DOMAIN:      ${DOMAIN:?DOMAIN is required, e.g. prs.mondomaine.fr}
+      ACME_EMAIL:  ${ACME_EMAIL:?ACME_EMAIL is required for Let's Encrypt}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - prs-net
+    depends_on:
+      - app
+
+  litestream:
+    image: litestream/litestream:0.3
+    container_name: prs-litestream
+    restart: unless-stopped
+    # On monte le MÊME volume app-data que le conteneur app, en lecture/écriture
+    # (Litestream a besoin d'écrire sur le WAL). Les deux processus coexistent
+    # sans conflit grâce au mode WAL + FileLock de SQLite.
+    volumes:
+      - app-data:/data
+      - app-backups:/backups
+      - ./litestream.yml:/etc/litestream.yml:ro
+    environment:
+      # Décommenter pour activer un réplica S3-compatible (OVH Object Storage,
+      # Scaleway, Backblaze B2, etc.). Voir litestream.yml pour la config.
+      LITESTREAM_ACCESS_KEY_ID:     ${LITESTREAM_ACCESS_KEY_ID:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${LITESTREAM_SECRET_ACCESS_KEY:-}
+    command: replicate
+    networks:
+      - prs-net
+    depends_on:
+      - app
+
+networks:
+  prs-net:
+    driver: bridge
+
+volumes:
+  app-data:
+  app-backups:
+  caddy-data:
+  caddy-config:

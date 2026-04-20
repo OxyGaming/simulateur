@@ -62,7 +62,7 @@ function isSignal(v: unknown): v is Signal {
     typeof o.edgeId === 'string' && (o.edgeId as string).length > 0 &&
     (o.direction === 'AtoB' || o.direction === 'BtoA') &&
     typeof o.position === 'number' &&
-    (o.state === 'open' || o.state === 'closed') &&
+    (o.state === 'open' || o.state === 'maintained_open' || o.state === 'closed') &&
     typeof o.label === 'string'
   );
 }
@@ -247,18 +247,26 @@ export function validateLayout(json: string): ValidationResult {
   const rawSignals  = Array.isArray(obj.signals)  ? (obj.signals  as unknown[]) : [];
   const rawSwitches = Array.isArray(obj.switches) ? (obj.switches as unknown[]) : [];
 
-  const nodes   = rawNodes.filter(isNode);
-  const edges   = rawEdges.filter(isEdge);
-  const zones   = rawZones.filter(isZone);
-  const signals = rawSignals.filter(isSignal);
-  const switches = rawSwitches.filter(isSwitch);
+  const typedNodes    = rawNodes.filter(isNode);
+  const typedEdges    = rawEdges.filter(isEdge);
+  const typedZones    = rawZones.filter(isZone);
+  const typedSignals  = rawSignals.filter(isSignal);
+  const typedSwitches = rawSwitches.filter(isSwitch);
 
-  // Duplicate ID check
-  const allIds = [...nodes.map(n => n.id), ...edges.map(e => e.id), ...zones.map(z => z.id), ...signals.map(s => s.id), ...switches.map(sw => sw.id)];
-  const seen = new Set<string>();
+  // Déduplication des IDs (unicité globale sur toutes les entités).
+  // On garde la première occurrence, on jette les suivantes.
+  const seenIds = new Set<string>();
   let dupCount = 0;
-  for (const id of allIds) { if (seen.has(id)) dupCount++; seen.add(id); }
-  if (dupCount > 0) warnings.push(`${dupCount} ID(s) dupliqué(s) détecté(s).`);
+  const dedup = <T extends { id: string }>(arr: T[]): T[] => arr.filter(it => {
+    if (seenIds.has(it.id)) { dupCount++; return false; }
+    seenIds.add(it.id); return true;
+  });
+  const nodes    = dedup(typedNodes);
+  const edges    = dedup(typedEdges);
+  const zones    = dedup(typedZones);
+  const signals  = dedup(typedSignals);
+  const switches = dedup(typedSwitches);
+  if (dupCount > 0) warnings.push(`${dupCount} ID(s) dupliqué(s) détecté(s) — doublon(s) ignoré(s).`);
 
   // Cross-references
   const nodeIds = new Set(nodes.map(n => n.id));

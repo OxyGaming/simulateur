@@ -1,0 +1,42 @@
+# Caddyfile — reverse proxy pour Simulateur PRS.
+# HTTPS automatique via Let's Encrypt (ACME) sur le domaine fourni par $DOMAIN.
+
+{
+	email {$ACME_EMAIL}
+	# Décommenter pour forcer le staging Let's Encrypt (tests sans épuiser le quota prod)
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Sécurité de base — headers usuels.
+	header {
+		# HSTS : 1 an + subdomains + preload
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		Permissions-Policy        "geolocation=(), microphone=(), camera=()"
+		# On supprime le header Server par défaut.
+		-Server
+	}
+
+	# SSE (flux sync formateur ↔ apprenant) : désactiver le buffering et étendre
+	# les timeouts pour que les connexions longues ne soient pas coupées.
+	@sse path /api/sync/stream*
+	reverse_proxy @sse app:3000 {
+		flush_interval -1
+		transport http {
+			read_timeout  24h
+			write_timeout 24h
+		}
+	}
+
+	# Upload JSON : on relâche la limite par défaut (payloads layout).
+	request_body {
+		max_size 10MB
+	}
+
+	reverse_proxy app:3000
+}

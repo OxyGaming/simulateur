@@ -1,0 +1,51 @@
+# Litestream — réplication continue de la base SQLite du Simulateur PRS.
+#
+# Fonctionnement : Litestream tail le WAL de SQLite et streame les pages
+# modifiées vers un ou plusieurs "replicas". En cas de perte de la DB on peut
+# restaurer à n'importe quel instant couvert par la fenêtre de rétention.
+#
+# Deux réplicas sont définis :
+#   1. file:   vers /backups (volume Docker app-backups) — RTO très court,
+#              protège des erreurs humaines (`rm`, suppression layout, etc.)
+#   2. s3:     vers un bucket S3-compatible (OVH Object Storage S3, Scaleway,
+#              Backblaze B2, …) — protège de la perte du VPS.
+#
+# Le réplica S3 est DÉSACTIVÉ par défaut : décommentez son bloc et fournissez
+# les credentials via l'environnement (LITESTREAM_ACCESS_KEY_ID / SECRET) pour
+# l'activer.
+#
+# Commandes utiles (à exécuter DANS le conteneur prs-litestream) :
+#   litestream snapshots /data/app.db           # liste des snapshots
+#   litestream generations /data/app.db         # générations (une par base recréée)
+#   litestream restore -o /tmp/restored.db \
+#       file:///backups/app.db                  # restore depuis file replica
+#   litestream restore -o /tmp/restored.db \
+#       s3://bucket/app.db                      # restore depuis S3
+
+dbs:
+  - path: /data/app.db
+
+    # Fréquence des snapshots complets et rétention :
+    # - snapshot toutes les heures
+    # - on conserve 72 snapshots (≈ 3 jours)
+    # Les WAL frames sont streamés en continu entre les snapshots.
+    replicas:
+      - type: file
+        path: /backups/app.db
+        snapshot-interval: 1h
+        retention: 72h
+        # Désactiver la compaction agressive pour garder l'historique fin.
+        sync-interval: 1s
+
+      # ─── Réplica S3-compatible (décommentez pour activer) ────────────────
+      # - type: s3
+      #   # OVH Object Storage (région GRA, endpoint S3) — adapter si nécessaire.
+      #   endpoint:           https://s3.gra.cloud.ovh.net
+      #   region:             gra
+      #   bucket:             prs-backups
+      #   path:               app.db
+      #   access-key-id:      ${LITESTREAM_ACCESS_KEY_ID}
+      #   secret-access-key:  ${LITESTREAM_SECRET_ACCESS_KEY}
+      #   snapshot-interval:  6h
+      #   retention:          720h   # 30 jours
+      #   sync-interval:      10s
