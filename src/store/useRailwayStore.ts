@@ -205,8 +205,15 @@ function classifyFormationBlock(
 }
 
 /**
- * Try to transition all 'registered' / 'overregistered' buttons to 'forming'
- * if conditions are now met. Processes them in FIFO registration order.
+ * Try to advance all 'registered' / 'overregistered' buttons in FIFO order.
+ *
+ * Two possible transitions per waiting route, evaluated in order:
+ *   1. registered | overregistered → forming     (conditions now satisfied)
+ *   2. overregistered              → registered  (first slot freed, still blocked)
+ *
+ * The FIFO ordering is preserved across both transitions: the oldest waiter
+ * is considered first, which prevents a newer overregistered from jumping
+ * ahead of an older one into the first slot.
  *
  * Reference-stable: returns null when nothing changes.
  * Pure function — usable inside set() callbacks.
@@ -262,11 +269,15 @@ function tryActivateRegistered(
     const route = routes[btn.routeId!];
     if (!route) continue;
 
-    // Build active edge IDs from the in-progress updatedButtons (accounts for previously
-    // activated routes in the same loop iteration — prevents double-forming conflicts)
+    // Build active edge IDs from the in-progress updatedButtons. Include both
+    // 'active' AND 'forming': a route promoted to forming earlier in this loop
+    // iteration has reserved its edges — another waiting route must not also
+    // promote onto the same edges, or both would enter forming simultaneously
+    // and the second would fail canFormItineraire at activateButton time
+    // (→ 'conflict') once the first reaches 'active'.
     const activeEdgeIds = new Set(
       Object.values(updatedButtons)
-        .filter(b => b.state === 'active' && b.id !== btn.id && b.routeId)
+        .filter(b => (b.state === 'active' || b.state === 'forming') && b.id !== btn.id && b.routeId)
         .flatMap(b => routes[b.routeId!]?.edgeIds ?? []),
     );
 
@@ -290,8 +301,31 @@ function tryActivateRegistered(
         },
       };
       changed = true;
+      continue;
     }
-    // If still blocked: leave in registered/overregistered, don't re-classify here.
+
+    // Can't form yet. If this route is overregistered and the first slot is free,
+    // promote it to registered. The first slot is free when no other waiting
+    // route holds 'registered' state (forming/active routes are past the queue).
+    if (btn.state === 'overregistered') {
+      const hasRegisteredAhead = Object.values(updatedButtons).some(
+        b => b.state === 'registered' && b.id !== btn.id,
+      );
+      if (!hasRegisteredAhead) {
+        const routeId = route.id;
+        updatedButtons = {
+          ...updatedButtons,
+          [btn.id]: { ...btn, state: 'registered' as ButtonState },
+        };
+        // Preserve formingStartTime to keep FIFO ordering stable.
+        const prev = updatedRis[routeId] ?? initialInterlockingState(routeId, 'registered');
+        updatedRis = {
+          ...updatedRis,
+          [routeId]: { ...prev, buttonState: 'registered' as ButtonState },
+        };
+        changed = true;
+      }
+    }
   }
 
   if (!changed) return null;
@@ -1519,12 +1553,22 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
       }
       case 'registered':
       case 'overregistered': {
-        // Annulation de l'enregistrement/surenregistrement
+        // Annulation de l'enregistrement/surenregistrement.
+        // Si on libère le premier slot (registered), un surenregistré FIFO
+        // derrière doit pouvoir être promu à registered (ou directement à
+        // forming si les conditions le permettent).
         const routeId = button.routeId ?? '';
-        set(prev => ({
-          panelButtons:            { ...prev.panelButtons, [buttonId]: { ...button, state: 'idle' } },
-          routeInterlockingStates: omitKey(prev.routeInterlockingStates, routeId),
-        }));
+        set(prev => {
+          const cancelledButtons = { ...prev.panelButtons, [buttonId]: { ...button, state: 'idle' as ButtonState } };
+          const cancelledRis     = omitKey(prev.routeInterlockingStates, routeId);
+          const activation = tryActivateRegistered(
+            cancelledButtons, prev.routes, prev.zones, prev.switches, prev.trains, cancelledRis,
+          );
+          return {
+            panelButtons:            activation?.panelButtons            ?? cancelledButtons,
+            routeInterlockingStates: activation?.routeInterlockingStates ?? cancelledRis,
+          };
+        });
         break;
       }
       case 'active': {
