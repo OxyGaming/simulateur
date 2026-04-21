@@ -15,10 +15,14 @@ export const layouts = sqliteTable('layouts', {
   id:        text('id').primaryKey(),
   ownerId:   text('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name:      text('name').notNull(),
+  // Bibliothèque partagée : un layout public est visible (lecture + export) par
+  // tous les formateurs. Seul son propriétaire peut l'éditer ou le supprimer.
+  isPublic:  integer('is_public').notNull().default(0),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => ({
-  ownerIdx: index('idx_layouts_owner').on(t.ownerId),
+  ownerIdx:  index('idx_layouts_owner').on(t.ownerId),
+  publicIdx: index('idx_layouts_public').on(t.isPublic),
 }));
 
 // ─── layout_snapshots (append-only, un par "Sauvegarder") ─────────────────────

@@ -1,6 +1,11 @@
 import { CreateSnapshotSchema } from '@/lib/schemas/api';
-import { currentUser, badRequest, unauthorized, notFound } from '@/server/auth/guard';
-import { loadOwnedLayout, listSnapshots, addSnapshot } from '@/server/repositories/layouts';
+import {
+  currentUser, badRequest, unauthorized, notFound, forbidden,
+} from '@/server/auth/guard';
+import {
+  loadOwnedLayout, loadAccessibleLayout,
+  listSnapshots, addSnapshot,
+} from '@/server/repositories/layouts';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +16,7 @@ export async function GET(_req: Request, { params }: Params) {
   if (!user) return unauthorized();
   const { id } = await params;
 
-  if (!loadOwnedLayout(id, user.id)) return notFound();
+  if (!loadAccessibleLayout(id, user.id)) return notFound();
 
   return Response.json(listSnapshots(id));
 }
@@ -21,7 +26,8 @@ export async function POST(req: Request, { params }: Params) {
   if (!user) return unauthorized();
   const { id } = await params;
 
-  if (!loadOwnedLayout(id, user.id)) return notFound();
+  // Ajouter un snapshot = éditer : réservé au propriétaire.
+  if (!loadOwnedLayout(id, user.id)) return forbidden();
 
   let body: unknown;
   try { body = await req.json(); } catch { return badRequest('json_invalid'); }

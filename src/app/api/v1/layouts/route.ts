@@ -1,13 +1,20 @@
 import { CreateLayoutSchema } from '@/lib/schemas/api';
 import { currentUser, badRequest, unauthorized } from '@/server/auth/guard';
-import { createLayoutWithSnapshot, listLayoutsByOwner } from '@/server/repositories/layouts';
+import {
+  createLayoutWithSnapshot,
+  listLayoutsByOwner,
+  listPublicLayoutsExcludingOwner,
+} from '@/server/repositories/layouts';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   const user = await currentUser();
   if (!user) return unauthorized();
-  return Response.json(listLayoutsByOwner(user.id));
+  return Response.json({
+    mine:   listLayoutsByOwner(user.id),
+    shared: listPublicLayoutsExcludingOwner(user.id),
+  });
 }
 
 export async function POST(req: Request) {

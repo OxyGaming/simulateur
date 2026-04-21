@@ -1,5 +1,5 @@
 import { currentUser, unauthorized, notFound } from '@/server/auth/guard';
-import { loadOwnedLayout, getSnapshot } from '@/server/repositories/layouts';
+import { loadAccessibleLayout, getSnapshot } from '@/server/repositories/layouts';
 
 export const runtime = 'nodejs';
 
@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: Params) {
   if (!user) return unauthorized();
   const { id, sid } = await params;
 
-  if (!loadOwnedLayout(id, user.id)) return notFound();
+  if (!loadAccessibleLayout(id, user.id)) return notFound();
 
   const snap = getSnapshot(sid);
   if (!snap || snap.layoutId !== id) return notFound();

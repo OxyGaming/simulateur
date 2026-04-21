@@ -43,9 +43,19 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export type AuthUser = { id: string; email: string; displayName: string | null };
 
 export type LayoutMeta = {
-  id: string; ownerId: string; name: string;
+  id: string; ownerId: string; name: string; isPublic: number;
   createdAt: number; updatedAt: number;
   snapshotCount: number; latestSnapshotAt: number | null;
+};
+
+export type SharedLayoutMeta = LayoutMeta & {
+  ownerEmail: string;
+  ownerDisplayName: string | null;
+};
+
+export type LayoutsListResponse = {
+  mine:   LayoutMeta[];
+  shared: SharedLayoutMeta[];
 };
 
 export type SnapshotMeta = {
@@ -56,8 +66,16 @@ export type SnapshotMeta = {
 export type SnapshotFull = SnapshotMeta & { payload: LayoutPayload };
 
 export type LayoutWithLatest = {
-  layout: { id: string; ownerId: string; name: string; createdAt: number; updatedAt: number };
+  layout: {
+    id: string; ownerId: string; name: string; isPublic: number;
+    createdAt: number; updatedAt: number;
+  };
   latestSnapshot: SnapshotFull;
+};
+
+export type UserSummary = {
+  id: string; email: string; displayName: string | null;
+  createdAt: number; lastLoginAt: number | null;
 };
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -73,7 +91,7 @@ export const authApi = {
 // ─── Layouts ──────────────────────────────────────────────────────────────────
 
 export const layoutsApi = {
-  list:   () => request<LayoutMeta[]>('/api/v1/layouts'),
+  list:   () => request<LayoutsListResponse>('/api/v1/layouts'),
 
   create: (name: string, payload: LayoutPayload, note?: string) =>
     request<{ layout: LayoutMeta; snapshotId: string }>('/api/v1/layouts', {
@@ -88,8 +106,19 @@ export const layoutsApi = {
       method: 'PATCH', body: JSON.stringify({ name }),
     }),
 
+  setPublic: (id: string, isPublic: boolean) =>
+    request<LayoutMeta>(`/api/v1/layouts/${encodeURIComponent(id)}`, {
+      method: 'PATCH', body: JSON.stringify({ isPublic }),
+    }),
+
   remove: (id: string) =>
     request<{ ok: true }>(`/api/v1/layouts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  clone: (id: string) =>
+    request<{ layout: LayoutMeta; snapshotId: string }>(
+      `/api/v1/layouts/${encodeURIComponent(id)}/clone`,
+      { method: 'POST' },
+    ),
 
   listSnapshots: (id: string) =>
     request<SnapshotMeta[]>(`/api/v1/layouts/${encodeURIComponent(id)}/snapshots`),
@@ -103,4 +132,14 @@ export const layoutsApi = {
     request<SnapshotFull>(
       `/api/v1/layouts/${encodeURIComponent(id)}/snapshots/${encodeURIComponent(sid)}`,
     ),
+};
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export const usersApi = {
+  list: () => request<UserSummary[]>('/api/v1/users'),
+  create: (input: { email: string; password: string; displayName?: string | null }) =>
+    request<UserSummary>('/api/v1/users', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
 };

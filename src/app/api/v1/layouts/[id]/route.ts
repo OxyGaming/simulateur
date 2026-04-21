@@ -1,9 +1,10 @@
 import { PatchLayoutSchema } from '@/lib/schemas/api';
 import {
-  currentUser, badRequest, unauthorized, notFound,
+  currentUser, badRequest, unauthorized, notFound, forbidden,
 } from '@/server/auth/guard';
 import {
-  loadOwnedLayout, renameLayout, deleteLayoutById, getLatestSnapshot,
+  loadOwnedLayout, loadAccessibleLayout,
+  renameLayout, setLayoutPublic, deleteLayoutById, getLatestSnapshot,
 } from '@/server/repositories/layouts';
 
 export const runtime = 'nodejs';
@@ -15,7 +16,8 @@ export async function GET(_req: Request, { params }: Params) {
   if (!user) return unauthorized();
   const { id } = await params;
 
-  const layout = loadOwnedLayout(id, user.id);
+  // Lecture autorisée sur layout possédé OU public.
+  const layout = loadAccessibleLayout(id, user.id);
   if (!layout) return notFound();
 
   const latest = getLatestSnapshot(id);
@@ -40,7 +42,9 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!user) return unauthorized();
   const { id } = await params;
 
-  if (!loadOwnedLayout(id, user.id)) return notFound();
+  // Modification réservée au propriétaire — un layout partagé n'est pas éditable
+  // par les autres (ils doivent l'exporter et réimporter leur propre copie).
+  if (!loadOwnedLayout(id, user.id)) return forbidden();
 
   let body: unknown;
   try { body = await req.json(); } catch { return badRequest('json_invalid'); }
@@ -48,7 +52,13 @@ export async function PATCH(req: Request, { params }: Params) {
   const parsed = PatchLayoutSchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.flatten());
 
-  const updated = renameLayout(id, parsed.data.name);
+  let updated = null;
+  if (parsed.data.name !== undefined) {
+    updated = renameLayout(id, parsed.data.name);
+  }
+  if (parsed.data.isPublic !== undefined) {
+    updated = setLayoutPublic(id, parsed.data.isPublic);
+  }
   return Response.json(updated);
 }
 
@@ -57,7 +67,7 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!user) return unauthorized();
   const { id } = await params;
 
-  if (!loadOwnedLayout(id, user.id)) return notFound();
+  if (!loadOwnedLayout(id, user.id)) return forbidden();
 
   deleteLayoutById(id);
   return Response.json({ ok: true });
