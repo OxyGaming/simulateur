@@ -370,9 +370,9 @@ export function LearnerPupitreCanvas({
           const isBlink = isForming || isDmtExpired;
           const ledOn = !isBlink || blinkPhase;
           const configured = isAnn ? btn.annulateurZoneIds.length > 0 : isFC ? !!btn.fcSignalId : !!btn.routeId;
+          // Côté apprenant : seuls les messages formation/enregistrement/surenregistrement sont lisibles.
           const STATE_TAG: Partial<Record<ButtonState, string>> = {
-            forming: 'FORM.', active: isDmtExpired ? '2E GESTE' : 'ACTIF',
-            conflict: 'CONF.', registered: 'ENREG.', overregistered: 'SURENR.',
+            forming: 'FORM.', registered: 'ENREG.', overregistered: 'SURENR.',
           };
           const stateTag = STATE_TAG[btn.state] ?? '';
           const reflexions = btn.reflexions ?? [];

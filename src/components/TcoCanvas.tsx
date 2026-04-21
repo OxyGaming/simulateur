@@ -356,8 +356,8 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
         );
       })}
 
-      {/* ── Train markers ────────────────────────────────────────────────── */}
-      {trains.map(train => {
+      {/* ── Train markers (formateur uniquement) ─────────────────────────── */}
+      {!readOnly && trains.map(train => {
         const edge = edges.find(e => e.id === train.edgeId);
         if (!edge) return null;
         const fromNode = nodes.find(n => n.id === edge.fromNodeId);
