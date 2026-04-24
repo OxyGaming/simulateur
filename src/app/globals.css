@@ -1,3 +1,8 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   PRS Simulator — Responsive globals
+   Breakpoints: mobile < 640px · tablet 640-1024px · desktop ≥ 1024px
+   ───────────────────────────────────────────────────────────────────────────── */
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -5,8 +10,28 @@
 html, body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
   height: 100%;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* L'éditeur et l'apprenant (canvas plein écran) désactivent le scroll root.
+   Les pages "document" (login, layouts, users) restent scrollables sur mobile.
+   Chaque page décide via une classe sur <body> ou un style inline. */
+body {
+  overflow: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #0a0f1e;
+  color: #f1f5f9;
+}
+
+/* Les pages qui veulent vraiment verrouiller le scroll (canvas app) ajoutent
+   cette classe via un effet useEffect. */
+body.prs-lock-scroll {
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -17,4 +42,123 @@ input[type="number"]::-webkit-outer-spin-button {
 select option {
   background: #1e293b;
   color: white;
+}
+
+/* Cibles tactiles plus grandes sur tactile pur (pointer: coarse) */
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+  input, select, textarea {
+    font-size: 16px !important; /* évite le zoom automatique iOS */
+  }
+}
+
+/* ─── Utilitaires responsives ──────────────────────────────────────────────── */
+
+.prs-only-mobile { display: none !important; }
+.prs-only-tablet { display: none !important; }
+.prs-only-desktop { display: initial !important; }
+
+.prs-hide-mobile { display: initial; }
+.prs-hide-tablet { display: initial; }
+.prs-hide-desktop { display: none; }
+
+@media (max-width: 639px) {
+  .prs-only-mobile  { display: initial !important; }
+  .prs-only-desktop { display: none !important; }
+  .prs-hide-mobile  { display: none !important; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .prs-only-tablet  { display: initial !important; }
+  .prs-only-desktop { display: none !important; }
+  .prs-hide-tablet  { display: none !important; }
+}
+
+@media (min-width: 1024px) {
+  .prs-hide-desktop { display: none !important; }
+}
+
+/* Poignées de redimensionnement plus épaisses sur tactile */
+@media (pointer: coarse) {
+  .prs-resize-grip {
+    min-width: 14px !important;
+    min-height: 14px !important;
+  }
+}
+
+/* ─── Drawer / Overlay (pupitre et propriétés en mobile éditeur) ──────────── */
+
+.prs-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 90;
+  animation: prs-fade-in 0.15s ease-out;
+}
+
+/* Force un panneau avec largeur fixe à remplir son conteneur (drawers mobiles) */
+.prs-panel-fill,
+.prs-panel-fill > aside,
+.prs-panel-fill > div {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+@keyframes prs-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Tables -> cartes sur mobile (users dashboard) ──────────────────────── */
+
+@media (max-width: 639px) {
+  .prs-table-row {
+    flex-direction: column !important;
+    gap: 4px !important;
+    align-items: flex-start !important;
+  }
+  .prs-table-head {
+    display: none !important;
+  }
+  .prs-table-cell::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .prs-table-cell {
+    flex: none !important;
+    width: 100%;
+  }
+}
+
+/* ─── Scrollbars subtiles partout ─────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

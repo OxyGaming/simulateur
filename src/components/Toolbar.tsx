@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRailwayStore } from '@/store/useRailwayStore';
 import { EditorMode } from '@/types/railway';
 import { validateLayout } from '@/lib/validation';
+import { useIsNarrow } from '@/hooks/useMediaQuery';
 
 // ─── Mode definitions ─────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ interface ToolbarProps {
 export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: ToolbarProps = {}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [notif, setNotif] = useState<Notif | null>(null);
+  const isNarrow = useIsNarrow();
 
   const mode        = useRailwayStore(s => s.mode);
   const setMode     = useRailwayStore(s => s.setMode);
@@ -183,9 +185,13 @@ export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: To
 
   return (
     <div style={{ flexShrink: 0 }}>
-      <div style={styles.bar}>
-        <span style={styles.brand}>PRS Simulator</span>
-        <div style={styles.separator} />
+      <div style={{ ...styles.bar, ...(isNarrow ? styles.barNarrow : {}) }}>
+        {!isNarrow && (
+          <>
+            <span style={styles.brand}>PRS Simulator</span>
+            <div style={styles.separator} />
+          </>
+        )}
 
         {MODES.map(({ mode: m, label, shortcut, icon }) => {
           const active = mode === m;
@@ -197,26 +203,26 @@ export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: To
               style={{ ...styles.btn, ...(active ? styles.btnActive : {}) }}
             >
               <span style={styles.btnIcon}>{icon}</span>
-              <span>{label}</span>
-              <kbd style={styles.kbd}>{shortcut}</kbd>
+              {!isNarrow && <span>{label}</span>}
+              {!isNarrow && <kbd style={styles.kbd}>{shortcut}</kbd>}
             </button>
           );
         })}
 
-        <div style={{ flex: 1 }} />
+        {!isNarrow && <div style={{ flex: 1 }} />}
 
         <a href="/mode-operatoire.html" target="_blank" rel="noopener noreferrer" style={styles.btnHelp} title="Ouvrir le mode opératoire">
-          ? Aide
+          ?{!isNarrow && ' Aide'}
         </a>
 
         {/* Session code + lien apprenant */}
         {sessionCode && (
           <>
-            <div style={styles.separator} />
-            <span style={styles.sessionLabel}>SESSION</span>
+            {!isNarrow && <div style={styles.separator} />}
+            {!isNarrow && <span style={styles.sessionLabel}>SESSION</span>}
             <span style={styles.sessionCode}>{sessionCode}</span>
             <button style={styles.btnCopyLink} onClick={onCopyLink} title="Copier le lien apprenant">
-              {linkCopied ? '✓ Copié !' : '⎘ Lien apprenant'}
+              {linkCopied ? '✓' : '⎘'}{!isNarrow && (linkCopied ? ' Copié !' : ' Lien apprenant')}
             </button>
             <button style={styles.btnRenew} onClick={onRenewCode} title="Générer un nouveau code de session">
               ↺
@@ -225,20 +231,24 @@ export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: To
         )}
         {!sessionCode && (
           <Link href="/apprenant" style={styles.btnApprenant} title="Ouvrir la vue apprenant">
-            Vue apprenant
+            {isNarrow ? '👤' : 'Vue apprenant'}
           </Link>
         )}
 
         <button onClick={handleExport} style={styles.btnSecondary} title="Exporter en JSON">
-          ↓ Exporter
+          ↓{!isNarrow && ' Exporter'}
         </button>
         <button onClick={() => fileInputRef.current?.click()} style={styles.btnSecondary} title="Importer depuis JSON">
-          ↑ Importer
+          ↑{!isNarrow && ' Importer'}
         </button>
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
 
-        <div style={styles.separator} />
-        <span style={styles.hint}>Suppr. = supprimer · Échap = sélection</span>
+        {!isNarrow && (
+          <>
+            <div style={styles.separator} />
+            <span style={styles.hint}>Suppr. = supprimer · Échap = sélection</span>
+          </>
+        )}
       </div>
 
       {notif && (
@@ -254,7 +264,8 @@ export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: To
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles: Record<string, React.CSSProperties> = {
-  bar: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', background: '#0f172a', borderBottom: '1px solid #1e3a5f' },
+  bar: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', background: '#0f172a', borderBottom: '1px solid #1e3a5f', overflowX: 'auto', flexWrap: 'nowrap', scrollbarWidth: 'thin' },
+  barNarrow: { gap: 4, padding: '6px 8px' },
   brand: { color: '#4a90d9', fontWeight: 700, fontSize: 14, fontFamily: 'monospace', letterSpacing: 1, whiteSpace: 'nowrap' },
   separator: { width: 1, height: 24, background: '#1e3a5f', margin: '0 4px', flexShrink: 0 },
   btn: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: '#1e293b', color: '#94a3b8', border: '1px solid #334155', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontFamily: 'system-ui, sans-serif', whiteSpace: 'nowrap' },

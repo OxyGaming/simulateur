@@ -82,7 +82,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex', justifyContent: 'flex-end',
   },
   drawer: {
-    width: 440, height: '100vh', background: '#0f172a',
+    width: 'min(440px, 92vw)', height: '100dvh', background: '#0f172a',
     borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column',
     color: '#f1f5f9',
   },

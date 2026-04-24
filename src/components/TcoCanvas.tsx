@@ -40,6 +40,84 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
+  // ── Touch pan / pinch-zoom (readOnly → apprenant) ──────────────────────────
+  useEffect(() => {
+    if (!readOnly) return;
+    const el = svgRef.current;
+    if (!el) return;
+
+    let mode: 'none' | 'pan' | 'pinch' = 'none';
+    let lastX = 0, lastY = 0;
+    let pinchDist = 0;
+    let pinchCX = 0, pinchCY = 0;
+
+    const distance = (a: Touch, b: Touch) => {
+      const dx = a.clientX - b.clientX, dy = a.clientY - b.clientY;
+      return Math.hypot(dx, dy);
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        mode = 'pan';
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        mode = 'pinch';
+        const [a, b] = [e.touches[0], e.touches[1]];
+        pinchDist = distance(a, b);
+        const rect = el.getBoundingClientRect();
+        pinchCX = (a.clientX + b.clientX) / 2 - rect.left;
+        pinchCY = (a.clientY + b.clientY) / 2 - rect.top;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (mode === 'pan' && e.touches.length === 1) {
+        e.preventDefault();
+        const t = e.touches[0];
+        const dx = t.clientX - lastX, dy = t.clientY - lastY;
+        lastX = t.clientX; lastY = t.clientY;
+        setVp(prev => ({ ...prev, panX: prev.panX + dx, panY: prev.panY + dy }));
+      } else if (mode === 'pinch' && e.touches.length === 2) {
+        e.preventDefault();
+        const [a, b] = [e.touches[0], e.touches[1]];
+        const d = distance(a, b);
+        if (pinchDist === 0) { pinchDist = d; return; }
+        const factor = d / pinchDist;
+        pinchDist = d;
+        setVp(prev => {
+          const newZoom = Math.min(8, Math.max(0.1, prev.zoom * factor));
+          const af = newZoom / prev.zoom;
+          return {
+            zoom: newZoom,
+            panX: pinchCX - (pinchCX - prev.panX) * af,
+            panY: pinchCY - (pinchCY - prev.panY) * af,
+          };
+        });
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) mode = 'none';
+      else if (e.touches.length === 1) {
+        mode = 'pan';
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [readOnly]);
+
   const nodes          = useRailwayStore(s => s.nodes);
   const edges          = useRailwayStore(s => s.edges);
   const zones          = useRailwayStore(s => s.zones);
@@ -204,7 +282,12 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
       ref={svgRef}
       width="100%"
       height="100%"
-      style={{ display: 'block', background: '#111827', cursor: readOnly ? 'default' : canvasCursor }}
+      style={{
+        display: 'block',
+        background: '#111827',
+        cursor: readOnly ? 'default' : canvasCursor,
+        touchAction: readOnly ? 'none' : 'auto',
+      }}
       {...svgHandlers}
     >
       <defs>

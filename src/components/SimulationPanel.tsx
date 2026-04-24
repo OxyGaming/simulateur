@@ -201,7 +201,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
-    maxHeight: 320,
+    maxHeight: 'min(320px, 40vh)',
     overflowY: 'auto',
   },
   header: {

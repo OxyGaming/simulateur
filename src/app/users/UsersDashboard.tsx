@@ -97,23 +97,31 @@ export function UsersDashboard({
 
         <h2 style={{ ...s.h2, marginTop: 32 }}>Comptes existants ({users.length})</h2>
         <div style={s.table}>
-          <div style={s.thead}>
+          <div style={s.thead} className="prs-table-head">
             <div style={{ flex: 2 }}>Email</div>
             <div style={{ flex: 2 }}>Nom</div>
             <div style={{ flex: 1 }}>Créé le</div>
             <div style={{ flex: 1 }}>Dernière connexion</div>
           </div>
           {users.map(u => (
-            <div key={u.id} style={s.trow}>
-              <div style={{ flex: 2 }}>
+            <div key={u.id} style={s.trow} className="prs-table-row">
+              <div style={{ flex: 2, wordBreak: 'break-all' }} className="prs-table-cell" data-label="Email">
                 {u.email}
                 {u.id === currentUserId && <span style={s.meBadge}>vous</span>}
               </div>
-              <div style={{ flex: 2, color: u.displayName ? undefined : '#64748b' }}>
+              <div
+                style={{ flex: 2, color: u.displayName ? undefined : '#64748b' }}
+                className="prs-table-cell"
+                data-label="Nom"
+              >
                 {u.displayName || '—'}
               </div>
-              <div style={{ flex: 1, color: '#94a3b8' }}>{fmtDate(u.createdAt)}</div>
-              <div style={{ flex: 1, color: '#94a3b8' }}>{fmtDate(u.lastLoginAt)}</div>
+              <div style={{ flex: 1, color: '#94a3b8' }} className="prs-table-cell" data-label="Créé le">
+                {fmtDate(u.createdAt)}
+              </div>
+              <div style={{ flex: 1, color: '#94a3b8' }} className="prs-table-cell" data-label="Dernière connexion">
+                {fmtDate(u.lastLoginAt)}
+              </div>
             </div>
           ))}
         </div>
@@ -136,33 +144,37 @@ const s: Record<string, React.CSSProperties> = {
           fontFamily: 'system-ui, -apple-system, sans-serif' },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '14px 28px', borderBottom: '1px solid #1e293b', background: '#0f172a',
+    padding: 'clamp(10px, 2vw, 14px) clamp(14px, 4vw, 28px)',
+    borderBottom: '1px solid #1e293b', background: '#0f172a',
+    gap: 10, flexWrap: 'wrap',
   },
   brand: { fontWeight: 600, fontSize: 15 },
   user:  { display: 'flex', alignItems: 'center', gap: 14, fontSize: 13 },
-  main:  { maxWidth: 1000, margin: '0 auto', padding: '32px 28px' },
-  h1:    { margin: '0 0 6px', fontSize: 22, fontWeight: 600 },
+  main:  { maxWidth: 1000, margin: '0 auto', padding: 'clamp(18px, 4vw, 32px) clamp(14px, 4vw, 28px)' },
+  h1:    { margin: '0 0 6px', fontSize: 'clamp(18px, 3.5vw, 22px)', fontWeight: 600 },
   h2:    { margin: '0 0 12px', fontSize: 16, fontWeight: 600 },
   hint:  { color: '#94a3b8', fontSize: 13, margin: '0 0 24px' },
   form:  {
     background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8,
-    padding: 18, display: 'flex', flexDirection: 'column', gap: 14,
+    padding: 'clamp(14px, 3vw, 18px)',
+    display: 'flex', flexDirection: 'column', gap: 14,
   },
-  row:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 },
+  row:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px, 100%),1fr))', gap: 12 },
   label: { display: 'flex', flexDirection: 'column', gap: 6 },
   labelText: { fontSize: 12, color: '#94a3b8' },
   input: {
-    padding: '8px 10px', background: '#0a0f1e', border: '1px solid #334155',
-    borderRadius: 6, color: '#f1f5f9', fontSize: 13, fontFamily: 'inherit',
+    padding: '10px 12px', background: '#0a0f1e', border: '1px solid #334155',
+    borderRadius: 6, color: '#f1f5f9', fontSize: 14, fontFamily: 'inherit',
+    width: '100%', boxSizing: 'border-box',
   },
   primary: {
-    alignSelf: 'flex-start', padding: '8px 14px', background: '#2563eb',
+    alignSelf: 'flex-start', padding: '10px 16px', background: '#2563eb',
     border: 'none', borderRadius: 6, color: 'white', cursor: 'pointer',
     fontSize: 13, fontWeight: 600,
   },
   linkBtn: {
     background: 'transparent', border: 'none', color: '#60a5fa',
-    cursor: 'pointer', fontSize: 13, padding: '4px 8px',
+    cursor: 'pointer', fontSize: 13, padding: '6px 10px',
   },
   table: {
     background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, overflow: 'hidden',
@@ -173,7 +185,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8',
   },
   trow: {
-    display: 'flex', gap: 14, padding: '10px 16px',
+    display: 'flex', gap: 14, padding: '12px 16px',
     borderBottom: '1px solid #1e293b', fontSize: 13,
   },
   meBadge: {

@@ -68,7 +68,9 @@ export function LoginForm() {
 const form: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex', flexDirection: 'column', gap: 14,
-    width: 360, padding: 28, background: '#0f172a',
+    width: '100%', maxWidth: 360,
+    padding: 'clamp(20px, 5vw, 28px)',
+    background: '#0f172a',
     border: '1px solid #1e293b', borderRadius: 10,
     boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
   },
@@ -76,12 +78,13 @@ const form: Record<string, React.CSSProperties> = {
   sub:   { margin: 0, marginBottom: 8, color: '#94a3b8', fontSize: 13 },
   label: { display: 'flex', flexDirection: 'column', gap: 4, color: '#cbd5e1', fontSize: 13 },
   input: {
-    padding: '8px 10px', background: '#0a0f1e', border: '1px solid #334155',
-    borderRadius: 6, color: '#f1f5f9', fontSize: 14, outline: 'none',
+    padding: '10px 12px', background: '#0a0f1e', border: '1px solid #334155',
+    borderRadius: 6, color: '#f1f5f9', fontSize: 16, outline: 'none',
+    width: '100%', boxSizing: 'border-box',
   },
   button: {
-    marginTop: 6, padding: '10px 14px', background: '#2563eb',
-    border: 'none', borderRadius: 6, color: 'white', fontSize: 14,
+    marginTop: 6, padding: '12px 14px', background: '#2563eb',
+    border: 'none', borderRadius: 6, color: 'white', fontSize: 15,
     fontWeight: 600, cursor: 'pointer',
   },
   error: {

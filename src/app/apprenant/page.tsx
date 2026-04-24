@@ -4,6 +4,7 @@ import { TcoCanvas } from '@/components/TcoCanvas';
 import { LearnerPupitreCanvas } from '@/components/LearnerPupitreCanvas';
 import { useSyncReceiver } from '@/hooks/useSyncReceiver';
 import { useLearnerActionPublisher } from '@/hooks/useLearnerActionPublisher';
+import { useIsMobile, useLockBodyScroll } from '@/hooks/useMediaQuery';
 import type { LearnerAction } from '@/types/sync';
 
 const MIN_PUPITRE_H     = 120;
@@ -11,6 +12,8 @@ const MAX_PUPITRE_H     = 600;
 const DEFAULT_PUPITRE_H = 280;
 
 export default function ApprenantPage() {
+  useLockBodyScroll(true);
+  const isMobile = useIsMobile();
   // ── Code de session (lu depuis l'URL) ──────────────────────────────────────
   const [sessionCode, setSessionCode] = useState<string | null>(null);
   const [inputCode,   setInputCode]   = useState('');
@@ -51,23 +54,56 @@ export default function ApprenantPage() {
     sendDirectAction({ type: 'pressButton', buttonId });
   }, [sendDirectAction]);
 
-  // ── Resize pupitre ─────────────────────────────────────────────────────────
+  // ── Resize pupitre (souris + tactile) ──────────────────────────────────────
   const [pupitreH, setPupitreH] = useState(DEFAULT_PUPITRE_H);
   const isDragging = useRef(false);
   const startY     = useRef(0);
   const startH     = useRef(DEFAULT_PUPITRE_H);
 
   useEffect(() => {
+    const applyDy = (dy: number) => {
+      const maxAllowed = Math.min(MAX_PUPITRE_H, window.innerHeight - 160);
+      const newH = Math.min(maxAllowed, Math.max(MIN_PUPITRE_H, startH.current + dy));
+      setPupitreH(newH);
+    };
     const onMove = (e: MouseEvent) => {
       if (!isDragging.current) return;
-      const dy  = startY.current - e.clientY;
-      const newH = Math.min(MAX_PUPITRE_H, Math.max(MIN_PUPITRE_H, startH.current + dy));
-      setPupitreH(newH);
+      applyDy(startY.current - e.clientY);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDragging.current || !e.touches[0]) return;
+      e.preventDefault();
+      applyDy(startY.current - e.touches[0].clientY);
     };
     const onUp = () => { isDragging.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onUp);
+      window.removeEventListener('touchcancel', onUp);
+    };
+  }, []);
+
+  // Ajuste la hauteur par défaut si la fenêtre change (mobile rotation, resize)
+  useEffect(() => {
+    const onResize = () => {
+      setPupitreH(h => {
+        const maxAllowed = Math.min(MAX_PUPITRE_H, window.innerHeight - 160);
+        return Math.min(h, maxAllowed);
+      });
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
   }, []);
 
   // ── Écran de saisie du code si pas de session dans l'URL ──────────────────
@@ -99,26 +135,36 @@ export default function ApprenantPage() {
   }
 
   // ── Vue principale ─────────────────────────────────────────────────────────
+  const onDividerDown = (clientY: number) => {
+    isDragging.current = true;
+    startY.current = clientY;
+    startH.current = pupitreH;
+  };
+
   return (
     <div style={layout.root}>
-      {/* Header */}
-      <div style={layout.header}>
-        <span style={layout.title}>PRS Simulator — Vue Apprenant</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Badge session */}
+      {/* Header — 2 lignes sur mobile pour éviter le débordement */}
+      <div style={{ ...layout.header, ...(isMobile ? layout.headerMobile : {}) }}>
+        <span style={layout.title}>
+          {isMobile ? 'PRS — Apprenant' : 'PRS Simulator — Vue Apprenant'}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={layout.sessionBadge}>
-            SESSION&nbsp;<strong style={{ letterSpacing: 4, color: '#38bdf8' }}>{sessionCode}</strong>
+            {isMobile ? '' : 'SESSION\u00a0'}
+            <strong style={{ letterSpacing: 4, color: '#38bdf8' }}>{sessionCode}</strong>
           </span>
-          {/* Statut connexion */}
           <span style={{
             ...layout.statusDot,
             background: status === 'connected' ? '#22c55e' : status === 'connecting' ? '#f59e0b' : '#ef4444',
           }} title={status} />
-          <span style={layout.statusText}>
-            {status === 'connected' ? 'Connecté' : status === 'connecting' ? 'Connexion…' : 'Déconnecté'}
-          </span>
-          {/* Lien formateur */}
-          <a href="/" style={layout.link}>← Vue Formateur</a>
+          {!isMobile && (
+            <span style={layout.statusText}>
+              {status === 'connected' ? 'Connecté' : status === 'connecting' ? 'Connexion…' : 'Déconnecté'}
+            </span>
+          )}
+          <a href="/" style={layout.link}>
+            {isMobile ? '← Form.' : '← Vue Formateur'}
+          </a>
         </div>
       </div>
 
@@ -134,10 +180,11 @@ export default function ApprenantPage() {
       </div>
 
       <div
-        style={layout.divider}
-        onMouseDown={e => { isDragging.current = true; startY.current = e.clientY; startH.current = pupitreH; e.preventDefault(); }}
+        style={{ ...layout.divider, touchAction: 'none' }}
+        onMouseDown={e => { onDividerDown(e.clientY); e.preventDefault(); }}
+        onTouchStart={e => { if (e.touches[0]) onDividerDown(e.touches[0].clientY); }}
       >
-        <div style={layout.dividerGrip} />
+        <div style={layout.dividerGrip} className="prs-resize-grip" />
       </div>
 
       <div style={{ height: pupitreH, flexShrink: 0, overflow: 'hidden' }}>
@@ -153,26 +200,27 @@ export default function ApprenantPage() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const layout: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#0a0f1e', color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', overflow: 'hidden' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', background: '#080e1a', borderBottom: '1px solid #1e3a5f', flexShrink: 0 },
+  root: { display: 'flex', flexDirection: 'column', height: '100dvh', background: '#0a0f1e', color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', overflow: 'hidden' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', background: '#080e1a', borderBottom: '1px solid #1e3a5f', flexShrink: 0, gap: 10, flexWrap: 'wrap' },
+  headerMobile: { padding: '6px 10px', gap: 6 },
   title: { fontSize: 11, fontWeight: 700, fontFamily: 'monospace', letterSpacing: 1, textTransform: 'uppercase' as const, color: '#4a90d9' },
   sessionBadge: { fontSize: 10, fontFamily: 'monospace', color: '#64748b', background: '#0f172a', border: '1px solid #1e3a5f', padding: '2px 8px', borderRadius: 3 },
   statusDot: { width: 8, height: 8, borderRadius: '50%', display: 'inline-block' },
   statusText: { fontSize: 10, fontFamily: 'monospace', color: '#64748b' },
-  link: { fontSize: 10, fontFamily: 'monospace', color: '#475569', textDecoration: 'none', padding: '3px 8px', border: '1px solid #334155', borderRadius: 3 },
+  link: { fontSize: 10, fontFamily: 'monospace', color: '#475569', textDecoration: 'none', padding: '4px 10px', border: '1px solid #334155', borderRadius: 3, display: 'inline-flex', alignItems: 'center' },
   errorBanner: { background: '#2a1c1c', color: '#fca5a5', borderBottom: '1px solid #7f1d1d', textAlign: 'center' as const, padding: '4px 0', fontSize: 11, fontFamily: 'monospace', flexShrink: 0 },
-  canvas: { flex: 1, overflow: 'hidden', position: 'relative' as const },
-  divider: { height: 6, flexShrink: 0, cursor: 'row-resize', background: '#0a0f1e', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid #1e3a5f', borderBottom: '1px solid #1e3a5f' },
-  dividerGrip: { width: 40, height: 2, borderRadius: 2, background: '#334155', pointerEvents: 'none' as const },
+  canvas: { flex: 1, overflow: 'hidden', position: 'relative' as const, minHeight: 0 },
+  divider: { height: 10, flexShrink: 0, cursor: 'row-resize', background: '#0a0f1e', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid #1e3a5f', borderBottom: '1px solid #1e3a5f' },
+  dividerGrip: { width: 48, height: 3, borderRadius: 2, background: '#334155', pointerEvents: 'none' as const },
 };
 
 const joinLayout: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0f1e', fontFamily: 'system-ui, -apple-system, sans-serif' },
-  card: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 10, padding: '36px 40px', width: 320 },
-  logo: { fontSize: 22, fontWeight: 700, fontFamily: 'monospace', color: '#38bdf8', letterSpacing: 2 },
+  root: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', background: '#0a0f1e', fontFamily: 'system-ui, -apple-system, sans-serif', padding: 16 },
+  card: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 10, padding: 'clamp(24px, 6vw, 36px) clamp(24px, 6vw, 40px)', width: '100%', maxWidth: 360, boxSizing: 'border-box' },
+  logo: { fontSize: 22, fontWeight: 700, fontFamily: 'monospace', color: '#38bdf8', letterSpacing: 2, textAlign: 'center' },
   subtitle: { fontSize: 12, fontFamily: 'monospace', color: '#475569', textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 8 },
   label: { fontSize: 11, fontFamily: 'monospace', color: '#64748b', alignSelf: 'flex-start' },
-  input: { width: '100%', padding: '10px 14px', fontSize: 22, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 8, textAlign: 'center' as const, background: '#0a0f1e', border: '1px solid #334155', borderRadius: 6, color: '#f1f5f9', outline: 'none', boxSizing: 'border-box' as const, textTransform: 'uppercase' as const },
-  btn: { width: '100%', padding: '10px 0', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' },
+  input: { width: '100%', padding: '12px 14px', fontSize: 22, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 8, textAlign: 'center' as const, background: '#0a0f1e', border: '1px solid #334155', borderRadius: 6, color: '#f1f5f9', outline: 'none', boxSizing: 'border-box' as const, textTransform: 'uppercase' as const },
+  btn: { width: '100%', padding: '14px 0', fontSize: 14, fontFamily: 'monospace', fontWeight: 700, background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' },
   hint: { fontSize: 11, color: '#475569', fontFamily: 'monospace', textAlign: 'center' as const },
 };

@@ -9,6 +9,7 @@ import { SimulationPanel } from '@/components/SimulationPanel';
 import { useRailwayStore } from '@/store/useRailwayStore';
 import { useSyncPublisher } from '@/hooks/useSyncPublisher';
 import { useTrainerActionReceiver } from '@/hooks/useTrainerActionReceiver';
+import { useIsNarrow, useLockBodyScroll } from '@/hooks/useMediaQuery';
 import { ApiError, layoutsApi, type SnapshotMeta } from '@/lib/api-client';
 import { LAYOUT_SCHEMA_VERSION, type LayoutPayload } from '@/lib/schemas/layout';
 import { HistoryDrawer } from './HistoryDrawer';
@@ -68,6 +69,17 @@ export function EditorClient({
   const mode          = useRailwayStore(s => s.mode);
   const pendingEdge   = useRailwayStore(s => s.pendingEdge);
   const undo          = useRailwayStore(s => s.undo);
+  const selection     = useRailwayStore(s => s.selection);
+
+  useLockBodyScroll(true);
+  const isNarrow = useIsNarrow();
+  const [pupitreOpen, setPupitreOpen] = useState(false);
+  const [propsOpen, setPropsOpen]     = useState(false);
+
+  // Ouvre automatiquement le panneau propriétés quand on sélectionne un élément (mobile)
+  useEffect(() => {
+    if (isNarrow && selection) setPropsOpen(true);
+  }, [selection, isNarrow]);
 
   const [layoutName, setLayoutName] = useState(initialLayoutName);
 
@@ -164,15 +176,29 @@ export function EditorClient({
   const startW   = useRef(DEFAULT_PUPITRE_W);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!dragging.current) return;
-      const dx = e.clientX - startX.current;
+    const apply = (clientX: number) => {
+      const dx = clientX - startX.current;
       setPupitreW(Math.min(MAX_PUPITRE_W, Math.max(MIN_PUPITRE_W, startW.current + dx)));
+    };
+    const onMove = (e: MouseEvent) => { if (dragging.current) apply(e.clientX); };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragging.current || !e.touches[0]) return;
+      e.preventDefault();
+      apply(e.touches[0].clientX);
     };
     const onUp = () => { dragging.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onUp);
+      window.removeEventListener('touchcancel', onUp);
+    };
   }, []);
 
   // Ctrl+Z (inchangé)
@@ -187,12 +213,18 @@ export function EditorClient({
   const edgeHint   = mode === 'addEdge' ? (pendingEdge ? 'Cliquez sur le nœud de destination — Échap pour annuler' : 'Cliquez sur le nœud de départ') : null;
   const statusHint = edgeHint ?? STATUS_HINTS[mode] ?? null;
 
+  const onResizeStart = (clientX: number) => {
+    dragging.current = true;
+    startX.current = clientX;
+    startW.current = pupitreW;
+  };
+
   return (
     <div style={layout.root}>
       {/* Barre d'entête projet — au-dessus de la Toolbar existante */}
-      <div style={layout.projectBar}>
+      <div style={{ ...layout.projectBar, ...(isNarrow ? layout.projectBarNarrow : {}) }}>
         <button onClick={() => router.push('/layouts')} style={layout.backBtn} title="Retour au dashboard">
-          ← Mes layouts
+          ← {isNarrow ? '' : 'Mes layouts'}
         </button>
         <button onClick={renameThisLayout} style={layout.nameBtn} title="Renommer">
           {layoutName}
@@ -203,16 +235,16 @@ export function EditorClient({
             {saveMsg.text}
           </span>
         )}
-        {lastSavedAt && !saveMsg && (
+        {lastSavedAt && !saveMsg && !isNarrow && (
           <span style={layout.muted}>
             Dernière sauvegarde : {new Date(lastSavedAt).toLocaleTimeString('fr-FR')}
           </span>
         )}
-        <button onClick={() => setHistoryOpen(true)} style={layout.secondaryBtn}>
-          Historique
+        <button onClick={() => setHistoryOpen(true)} style={layout.secondaryBtn} title="Historique">
+          {isNarrow ? '⧗' : 'Historique'}
         </button>
-        <button onClick={() => saveSnapshot()} disabled={saving} style={layout.saveBtn}>
-          {saving ? 'Sauvegarde…' : 'Sauvegarder (Ctrl+S)'}
+        <button onClick={() => saveSnapshot()} disabled={saving} style={layout.saveBtn} title="Sauvegarder (Ctrl+S)">
+          {saving ? (isNarrow ? '…' : 'Sauvegarde…') : (isNarrow ? '💾' : 'Sauvegarder (Ctrl+S)')}
         </button>
       </div>
 
@@ -223,15 +255,48 @@ export function EditorClient({
         linkCopied={copied}
       />
 
-      <div style={layout.workspace}>
-        <PupitrePanel width={pupitreW} />
+      {/* Barre de contrôle des panneaux en mobile/tablette */}
+      {isNarrow && (
+        <div style={layout.panelToggleBar}>
+          <button onClick={() => setPupitreOpen(true)} style={layout.panelToggleBtn}>
+            ☰ Pupitre
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setPropsOpen(true)} style={layout.panelToggleBtn}>
+            Propriétés ☰
+          </button>
+        </div>
+      )}
 
-        <div
-          onMouseDown={(e) => { dragging.current = true; startX.current = e.clientX; startW.current = pupitreW; e.preventDefault(); }}
-          style={{ width: 5, cursor: 'col-resize', background: '#1e3a5f', flexShrink: 0, transition: 'background 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#3b82f6')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#1e3a5f')}
-        />
+      <div style={layout.workspace}>
+        {/* Pupitre : inline sur desktop, drawer sur mobile/tablette */}
+        {isNarrow ? (
+          pupitreOpen && (
+            <>
+              <div className="prs-drawer-backdrop" onClick={() => setPupitreOpen(false)} />
+              <div style={{ ...layout.drawerLeft, width: 'min(86vw, 420px)' }}>
+                <div style={layout.drawerHeader}>
+                  <span>Pupitre</span>
+                  <button onClick={() => setPupitreOpen(false)} style={layout.drawerClose} aria-label="Fermer">✕</button>
+                </div>
+                <div style={layout.drawerBody} className="prs-panel-fill">
+                  <PupitrePanel width={Math.min(420, typeof window !== 'undefined' ? window.innerWidth * 0.86 : 320)} />
+                </div>
+              </div>
+            </>
+          )
+        ) : (
+          <>
+            <PupitrePanel width={pupitreW} />
+            <div
+              onMouseDown={(e) => { onResizeStart(e.clientX); e.preventDefault(); }}
+              onTouchStart={(e) => { if (e.touches[0]) onResizeStart(e.touches[0].clientX); }}
+              style={{ width: 8, cursor: 'col-resize', background: '#1e3a5f', flexShrink: 0, transition: 'background 0.15s', touchAction: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#3b82f6')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#1e3a5f')}
+            />
+          </>
+        )}
 
         <div style={layout.canvas}>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -241,7 +306,25 @@ export function EditorClient({
           <SimulationPanel />
         </div>
 
-        <PropertiesPanel />
+        {/* Propriétés : inline sur desktop, drawer sur mobile/tablette */}
+        {isNarrow ? (
+          propsOpen && (
+            <>
+              <div className="prs-drawer-backdrop" onClick={() => setPropsOpen(false)} />
+              <div style={{ ...layout.drawerRight, width: 'min(86vw, 320px)' }}>
+                <div style={layout.drawerHeader}>
+                  <span>Propriétés</span>
+                  <button onClick={() => setPropsOpen(false)} style={layout.drawerClose} aria-label="Fermer">✕</button>
+                </div>
+                <div style={layout.drawerBody} className="prs-panel-fill">
+                  <PropertiesPanel />
+                </div>
+              </div>
+            </>
+          )
+        ) : (
+          <PropertiesPanel />
+        )}
       </div>
 
       {historyOpen && (
@@ -257,41 +340,87 @@ export function EditorClient({
 
 const layout: Record<string, React.CSSProperties> = {
   root: {
-    display: 'flex', flexDirection: 'column', height: '100vh',
+    display: 'flex', flexDirection: 'column', height: '100dvh',
     background: '#0a0f1e', color: 'white',
     fontFamily: 'system-ui, -apple-system, sans-serif',
+    overflow: 'hidden',
   },
   projectBar: {
     display: 'flex', alignItems: 'center', gap: 12,
     padding: '8px 14px', background: '#0f172a',
     borderBottom: '1px solid #1e293b', fontSize: 13,
+    flexShrink: 0,
+  },
+  projectBarNarrow: {
+    padding: '6px 8px', gap: 6,
   },
   backBtn: {
     background: 'transparent', border: 'none', color: '#60a5fa',
-    cursor: 'pointer', fontSize: 13, padding: '4px 8px',
+    cursor: 'pointer', fontSize: 13, padding: '6px 10px',
   },
   nameBtn: {
     background: 'transparent', border: '1px dashed transparent', color: '#f1f5f9',
     cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '4px 8px', borderRadius: 4,
+    maxWidth: '40vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   saveBtn: {
-    padding: '6px 14px', background: '#2563eb', border: 'none', borderRadius: 6,
+    padding: '8px 14px', background: '#2563eb', border: 'none', borderRadius: 6,
     color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+    flexShrink: 0,
   },
   secondaryBtn: {
-    padding: '6px 12px', background: '#1e293b', border: '1px solid #334155',
+    padding: '8px 12px', background: '#1e293b', border: '1px solid #334155',
     borderRadius: 6, color: '#f1f5f9', cursor: 'pointer', fontSize: 13,
+    flexShrink: 0,
   },
   okBadge:  { color: '#34d399', fontSize: 12 },
   errBadge: { color: '#fca5a5', fontSize: 12 },
   muted:    { color: '#64748b', fontSize: 12 },
-  workspace: { display: 'flex', flex: 1, overflow: 'hidden' },
-  canvas: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  workspace: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' },
+  canvas: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 },
   toast: {
     position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
     background: 'rgba(15, 23, 42, 0.9)', border: '1px solid #334155',
     color: '#94a3b8', padding: '6px 16px', borderRadius: 20,
     fontSize: 12, fontFamily: 'monospace', pointerEvents: 'none' as const,
     whiteSpace: 'nowrap', backdropFilter: 'blur(4px)',
+    maxWidth: 'calc(100% - 40px)', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  panelToggleBar: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '4px 8px', background: '#0a0f1e',
+    borderBottom: '1px solid #1e3a5f', flexShrink: 0,
+  },
+  panelToggleBtn: {
+    padding: '6px 10px', background: '#0f172a', border: '1px solid #334155',
+    borderRadius: 5, color: '#94a3b8', cursor: 'pointer', fontSize: 12,
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+  },
+  drawerLeft: {
+    position: 'absolute', left: 0, top: 0, bottom: 0,
+    background: '#0f172a', borderRight: '1px solid #1e3a5f',
+    zIndex: 100, display: 'flex', flexDirection: 'column',
+    boxShadow: '4px 0 20px rgba(0,0,0,0.5)',
+    animation: 'prs-fade-in 0.15s ease-out',
+  },
+  drawerRight: {
+    position: 'absolute', right: 0, top: 0, bottom: 0,
+    background: '#0f172a', borderLeft: '1px solid #1e3a5f',
+    zIndex: 100, display: 'flex', flexDirection: 'column',
+    boxShadow: '-4px 0 20px rgba(0,0,0,0.5)',
+    animation: 'prs-fade-in 0.15s ease-out',
+  },
+  drawerHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '10px 14px', borderBottom: '1px solid #1e3a5f',
+    fontSize: 13, fontWeight: 600, color: '#f1f5f9',
+    flexShrink: 0, background: '#080e1a',
+  },
+  drawerClose: {
+    background: 'transparent', border: 'none', color: '#64748b',
+    cursor: 'pointer', fontSize: 18, padding: '4px 10px', lineHeight: 1,
+  },
+  drawerBody: {
+    flex: 1, overflow: 'auto', minHeight: 0,
   },
 };

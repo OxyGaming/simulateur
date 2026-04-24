@@ -16,6 +16,8 @@ export default async function LoginPage() {
 }
 
 const page: React.CSSProperties = {
-  minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  minHeight: '100vh',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: '16px',
   background: '#0a0f1e', fontFamily: 'system-ui, -apple-system, sans-serif',
 };
