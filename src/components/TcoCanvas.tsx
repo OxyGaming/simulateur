@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { useRailwayStore } from '@/store/useRailwayStore';
 import { useCanvasInteraction } from '@/hooks/useCanvasInteraction';
 import { nodeCenter } from '@/lib/geometry';
@@ -18,8 +18,10 @@ const NOOP_LABEL: (type: string, id: string, offset: {x:number;y:number}, e: Rea
 export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // ── Wheel zoom / pan ────────────────────────────────────────────────────────
+  // ── Viewport state (zoom / pan) ─────────────────────────────────────────────
   const [vp, setVp] = useState({ zoom: 1, panX: 0, panY: 0 });
+
+  // ── Wheel zoom / pan ────────────────────────────────────────────────────────
 
   useEffect(() => {
     const el = svgRef.current;
@@ -124,6 +126,79 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const signals        = useRailwayStore(s => s.signals);
   const switches       = useRailwayStore(s => s.switches);
   const textLabels     = useRailwayStore(s => s.textLabels);
+
+  // ── Fit-to-view ─────────────────────────────────────────────────────────────
+  // Bounding box du contenu (nodes + textLabels) — utilisé pour centrer et
+  // scaler la vue sur l'ensemble du schéma. Critique sur mobile où le contenu
+  // a été positionné par le formateur en coordonnées desktop : sans recentrage,
+  // une partie est hors champ et l'apprenant ne sait pas dans quelle direction
+  // panner pour la retrouver.
+  const contentBounds = useMemo(() => {
+    if (nodes.length === 0 && textLabels.length === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      if (n.x < minX) minX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.x > maxX) maxX = n.x;
+      if (n.y > maxY) maxY = n.y;
+    }
+    for (const t of textLabels) {
+      if (t.x < minX) minX = t.x;
+      if (t.y < minY) minY = t.y;
+      if (t.x > maxX) maxX = t.x;
+      if (t.y > maxY) maxY = t.y;
+    }
+    if (!Number.isFinite(minX)) return null;
+    return { minX, minY, maxX, maxY };
+  }, [nodes, textLabels]);
+
+  const fitToView = useCallback(() => {
+    const el = svgRef.current;
+    if (!el || !contentBounds) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    // Padding pour englober labels, halos et signaux qui dépassent les centres
+    // de noeuds (mâts de signaux ~16 px, labels jusqu'à ~40 px).
+    const pad = 60;
+    const cw = (contentBounds.maxX - contentBounds.minX) + pad * 2;
+    const ch = (contentBounds.maxY - contentBounds.minY) + pad * 2;
+    if (cw <= 0 || ch <= 0) return;
+
+    const zoom = Math.min(rect.width / cw, rect.height / ch);
+    // On évite de zoomer en-dessous de 0.1 (illisible) et au-dessus de 2 (énorme
+    // sur écran desktop avec un schéma minuscule).
+    const z = Math.min(2, Math.max(0.1, zoom));
+
+    const cx = (contentBounds.minX + contentBounds.maxX) / 2;
+    const cy = (contentBounds.minY + contentBounds.maxY) / 2;
+    const panX = rect.width  / 2 - cx * z;
+    const panY = rect.height / 2 - cy * z;
+    setVp({ zoom: z, panX, panY });
+  }, [contentBounds]);
+
+  // Auto-fit au premier rendu — uniquement quand on a du contenu ET que le SVG
+  // a une taille mesurable (sinon on retry au frame suivant).
+  const hasFittedRef = useRef(false);
+  useEffect(() => {
+    if (hasFittedRef.current) return;
+    if (!contentBounds) return;
+
+    let raf = 0;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const el = svgRef.current;
+      if (el && el.clientWidth > 0 && el.clientHeight > 0) {
+        fitToView();
+        hasFittedRef.current = true;
+      } else {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelled = true; cancelAnimationFrame(raf); };
+  }, [contentBounds, fitToView]);
   const routes                  = useRailwayStore(s => s.routes);
   const panelButtons            = useRailwayStore(s => s.panelButtons);
   const routeInterlockingStates = useRailwayStore(s => s.routeInterlockingStates);
@@ -278,6 +353,7 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
     : null;
 
   return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
     <svg
       ref={svgRef}
       width="100%"
@@ -508,5 +584,36 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
 
       </g>{/* end zoomable group */}
     </svg>
+
+    {/* ── Recentrer button (overlay) ──────────────────────────────────────────
+        Critique sur mobile : sans recentrage manuel, l'apprenant peut perdre
+        complètement le schéma s'il pan trop loin (et le formateur n'a pas de
+        moyen rapide de réinitialiser la vue). */}
+    {contentBounds && (
+      <button
+        type="button"
+        onClick={fitToView}
+        title="Recentrer la vue sur le schéma"
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          padding: '7px 11px',
+          background: 'rgba(15, 23, 42, 0.9)',
+          border: '1px solid #1e3a5f',
+          borderRadius: 6,
+          color: '#22d3ee',
+          fontFamily: 'monospace',
+          fontSize: 11,
+          fontWeight: 700,
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          zIndex: 10,
+        }}
+      >
+        ⊕ Recentrer
+      </button>
+    )}
+    </div>
   );
 }

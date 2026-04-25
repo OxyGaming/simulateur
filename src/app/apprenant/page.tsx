@@ -55,10 +55,25 @@ export default function ApprenantPage() {
   }, [sendDirectAction]);
 
   // ── Resize pupitre (souris + tactile) ──────────────────────────────────────
+  // Sur mobile (vh < 700px ou écran étroit), 280 px est trop haut : il ne reste
+  // presque plus de place pour le schéma. On démarre à ~35% de la hauteur
+  // viewport, dans les bornes [MIN, DEFAULT]. Initialisation simple côté client
+  // pour éviter les mismatches d'hydratation.
   const [pupitreH, setPupitreH] = useState(DEFAULT_PUPITRE_H);
   const isDragging = useRef(false);
   const startY     = useRef(0);
   const startH     = useRef(DEFAULT_PUPITRE_H);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.innerHeight < 700 || window.innerWidth < 700) {
+      const target = Math.max(
+        MIN_PUPITRE_H,
+        Math.min(DEFAULT_PUPITRE_H, Math.floor(window.innerHeight * 0.35)),
+      );
+      setPupitreH(target);
+    }
+  }, []);
 
   useEffect(() => {
     const applyDy = (dy: number) => {
