@@ -1,46 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PRS Simulator — icône principale (variante E "Signal sur rail").
+  Mini-scène : un signal vert ouvert au-dessus d'un rail cyan.
+  Fidèle au rendu du SignalNode dans l'éditeur (mêmes couleurs/halo).
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PRS Simulator">
-  <!-- Fond -->
+  <!-- Fond avec coins arrondis (Android/iOS appliquent leur propre mask sur la version maskable) -->
   <rect width="512" height="512" rx="96" ry="96" fill="#0a0f1e"/>
-  <!-- Cadre cyan -->
-  <rect x="32" y="32" width="448" height="448" rx="72" ry="72"
-        fill="none" stroke="#22d3ee" stroke-width="6" opacity="0.35"/>
 
-  <!-- Signal : mât -->
-  <rect x="244" y="96" width="24" height="320" rx="6" fill="#cbd5e1"/>
+  <!-- Rails cyan -->
+  <line x1="48"  y1="384" x2="464" y2="384"
+        stroke="#22d3ee" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+  <line x1="48"  y1="408" x2="464" y2="408"
+        stroke="#22d3ee" stroke-width="16" stroke-linecap="round" opacity="0.55"/>
 
-  <!-- Tête de signal (boîtier) -->
-  <rect x="184" y="120" width="144" height="200" rx="20" fill="#1e293b" stroke="#334155" stroke-width="4"/>
-
-  <!-- Lampes -->
-  <circle cx="256" cy="170" r="28" fill="#ef4444"/>
-  <circle cx="256" cy="170" r="28" fill="#ef4444"/>
-  <circle cx="256" cy="170" r="14" fill="#fecaca" opacity="0.7"/>
-
-  <circle cx="256" cy="240" r="28" fill="#f59e0b"/>
-  <circle cx="256" cy="240" r="14" fill="#fde68a" opacity="0.5"/>
-
-  <circle cx="256" cy="290" r="28" fill="#22c55e"/>
-  <circle cx="256" cy="290" r="14" fill="#bbf7d0" opacity="0.7"/>
-
-  <!-- Voie ferrée stylisée (rails + traverses) -->
-  <g stroke="#64748b" stroke-width="6" stroke-linecap="round">
-    <line x1="96"  y1="416" x2="416" y2="416"/>
-    <line x1="96"  y1="440" x2="416" y2="440"/>
-  </g>
-  <g fill="#475569">
-    <rect x="116" y="408" width="22" height="40" rx="2"/>
-    <rect x="170" y="408" width="22" height="40" rx="2"/>
-    <rect x="224" y="408" width="22" height="40" rx="2"/>
-    <rect x="278" y="408" width="22" height="40" rx="2"/>
-    <rect x="332" y="408" width="22" height="40" rx="2"/>
-    <rect x="378" y="408" width="22" height="40" rx="2"/>
+  <!-- Traverses -->
+  <g stroke="#475569" stroke-width="14" stroke-linecap="round">
+    <line x1="96"  y1="368" x2="96"  y2="424"/>
+    <line x1="176" y1="368" x2="176" y2="424"/>
+    <line x1="256" y1="368" x2="256" y2="424"/>
+    <line x1="336" y1="368" x2="336" y2="424"/>
+    <line x1="416" y1="368" x2="416" y2="424"/>
   </g>
 
-  <!-- Étiquette PRS -->
-  <text x="256" y="92"
-        text-anchor="middle"
-        font-family="ui-monospace, 'SF Mono', Consolas, monospace"
-        font-size="44" font-weight="700"
-        fill="#22d3ee" letter-spacing="6">PRS</text>
+  <!-- Pied de mât (signal posé entre deux traverses, côté droit) -->
+  <line x1="288" y1="368" x2="352" y2="368"
+        stroke="#475569" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Mât -->
+  <line x1="320" y1="368" x2="320" y2="176"
+        stroke="#64748b" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Halo lumineux du signal ouvert -->
+  <circle cx="320" cy="160" r="88" fill="none" stroke="#22c55e" stroke-width="20" opacity="0.18"/>
+  <circle cx="320" cy="160" r="64" fill="none" stroke="#22c55e" stroke-width="16" opacity="0.40"/>
+
+  <!-- Tête de signal -->
+  <circle cx="320" cy="160" r="44" fill="#0f172a" stroke="#16a34a" stroke-width="12"/>
+
+  <!-- Lampe -->
+  <circle cx="320" cy="160" r="28" fill="#22c55e"/>
+
+  <!-- Reflet brillant -->
+  <circle cx="306" cy="146" r="10" fill="#bbf7d0" opacity="0.55"/>
 </svg>

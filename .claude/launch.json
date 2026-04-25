@@ -13,6 +13,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start"],
       "port": 3000
+    },
+    {
+      "name": "Icon Preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "tmp/icon-preview", "-p", "3030", "-c-1", "-s"],
+      "port": 3030,
+      "autoPort": true
     }
   ]
 }
