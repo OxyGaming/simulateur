@@ -212,7 +212,7 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const testZoneActive    = useRailwayStore(s => s.testZoneActive);
   const testAiguilleActive = useRailwayStore(s => s.testAiguilleActive);
 
-  const interaction = useCanvasInteraction(svgRef);
+  const interaction = useCanvasInteraction(svgRef, vp);
   const {
     mousePos,
     canvasCursor,

@@ -27,7 +27,10 @@ const INPUT_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useCanvasInteraction(svgRef: React.RefObject<SVGSVGElement | null>) {
+export function useCanvasInteraction(
+  svgRef: React.RefObject<SVGSVGElement | null>,
+  vp: { zoom: number; panX: number; panY: number },
+) {
   const dragRef       = useRef<DragState | null>(null);
   const wasDraggedRef = useRef(false);
 
@@ -80,7 +83,15 @@ export function useCanvasInteraction(svgRef: React.RefObject<SVGSVGElement | nul
   function getSvgPoint(e: React.MouseEvent): Point {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    // Inverser le transform `translate(panX, panY) scale(zoom)` appliqué au
+    // groupe de contenu : sans ça, clics et drags sont décalés dès qu'on zoome
+    // ou qu'un auto-fit a translaté la vue (typique en mobile).
+    return {
+      x: (screenX - vp.panX) / vp.zoom,
+      y: (screenY - vp.panY) / vp.zoom,
+    };
   }
 
   // ── SVG background click ────────────────────────────────────────────────────
