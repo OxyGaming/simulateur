@@ -52,7 +52,9 @@ export const accessRequests = sqliteTable('access_requests', {
   lastName:     text('last_name').notNull(),
   passwordHash: text('password_hash').notNull(),
   reason:       text('reason').notNull(),
-  status:       text('status').notNull().default('pending'),
+  // $type force l'inférence Drizzle vers le literal union plutôt que `string`,
+  // pour que le type matche celui exposé côté client (api-client.ts).
+  status:       text('status').$type<'pending' | 'approved' | 'rejected'>().notNull().default('pending'),
   createdAt:    integer('created_at').notNull(),
   reviewedAt:   integer('reviewed_at'),
   reviewedBy:   text('reviewed_by').references(() => users.id),
