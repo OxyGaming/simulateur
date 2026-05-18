@@ -27,9 +27,23 @@ export function UsersDashboard({
   const [pwd, setPwd]        = useState('');
   const [busy, setBusy]      = useState(false);
   const [busyReq, setBusyReq] = useState<string | null>(null);
+  const [busyUser, setBusyUser] = useState<string | null>(null);
   const [msg, setMsg]        = useState<{ kind: 'err' | 'ok'; text: string } | null>(null);
 
   const pendingRequests = requests.filter(r => r.status === 'pending');
+
+  async function onDelete(u: UserSummary) {
+    const label = u.displayName || u.email;
+    if (!confirm(`Supprimer définitivement le compte "${label}" ?\n\nCette action est irréversible.`)) return;
+    setBusyUser(u.id); setMsg(null);
+    try {
+      await usersApi.remove(u.id);
+      setUsers(prev => prev.filter(x => x.id !== u.id));
+      setMsg({ kind: 'ok', text: `Compte "${u.email}" supprimé.` });
+    } catch (e) {
+      setMsg({ kind: 'err', text: deleteErrMsg(e, label) });
+    } finally { setBusyUser(null); }
+  }
 
   async function onApprove(req: AccessRequestSummary) {
     setBusyReq(req.id); setMsg(null);
@@ -173,6 +187,7 @@ export function UsersDashboard({
             <div style={{ flex: 2 }}>Nom</div>
             <div style={{ flex: 1 }}>Créé le</div>
             <div style={{ flex: 1 }}>Dernière connexion</div>
+            <div style={{ flex: '0 0 110px', textAlign: 'right' }}>Actions</div>
           </div>
           {users.map(u => (
             <div key={u.id} style={s.trow} className="prs-table-row">
@@ -193,6 +208,24 @@ export function UsersDashboard({
               <div style={{ flex: 1, color: '#94a3b8' }} className="prs-table-cell" data-label="Dernière connexion">
                 {fmtDate(u.lastLoginAt)}
               </div>
+              <div
+                style={{ flex: '0 0 110px', textAlign: 'right' }}
+                className="prs-table-cell"
+                data-label="Actions"
+              >
+                {u.id === currentUserId ? (
+                  <span style={s.dimHint}>—</span>
+                ) : (
+                  <button
+                    onClick={() => onDelete(u)}
+                    disabled={busyUser === u.id}
+                    style={s.dangerSmall}
+                    title="Supprimer ce compte"
+                  >
+                    {busyUser === u.id ? '…' : 'Supprimer'}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -208,6 +241,21 @@ function errMsg(e: unknown): string {
   }
   if (e instanceof Error) return e.message;
   return String(e);
+}
+
+function deleteErrMsg(e: unknown, label: string): string {
+  if (e instanceof ApiError && e.details && typeof e.details === 'object') {
+    const d = e.details as { error?: string; layoutsCount?: number; snapshotsCount?: number; reviewsCount?: number };
+    if (d.error === 'self_delete')      return 'Vous ne pouvez pas supprimer votre propre compte.';
+    if (d.error === 'has_layouts')      return `Impossible de supprimer "${label}" : ${d.layoutsCount} layout(s) lui appartiennent. Supprimez-les d'abord.`;
+    if (d.error === 'has_contributions') {
+      const parts: string[] = [];
+      if (d.snapshotsCount) parts.push(`${d.snapshotsCount} snapshot(s)`);
+      if (d.reviewsCount)   parts.push(`${d.reviewsCount} demande(s) d'accès examinée(s)`);
+      return `Impossible de supprimer "${label}" : a contribué à ${parts.join(' et ')} sur des éléments encore actifs.`;
+    }
+  }
+  return errMsg(e);
 }
 
 const s: Record<string, React.CSSProperties> = {
@@ -247,6 +295,11 @@ const s: Record<string, React.CSSProperties> = {
     padding: '10px 14px', background: 'transparent', border: '1px solid #b91c1c',
     borderRadius: 6, color: '#fca5a5', cursor: 'pointer', fontSize: 13, fontWeight: 600,
   },
+  dangerSmall: {
+    padding: '4px 10px', background: 'transparent', border: '1px solid #7f1d1d',
+    borderRadius: 4, color: '#fca5a5', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+  },
+  dimHint: { color: '#475569', fontSize: 12 },
   badge: {
     display: 'inline-block', marginLeft: 8, padding: '2px 8px',
     background: '#1e40af', color: '#dbeafe', fontSize: 11,

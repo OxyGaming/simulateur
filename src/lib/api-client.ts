@@ -149,6 +149,8 @@ export const usersApi = {
     request<UserSummary>('/api/v1/users', {
       method: 'POST', body: JSON.stringify(input),
     }),
+  remove: (id: string) =>
+    request<{ ok: true }>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 // ─── Access requests (côté admin/formateur) ──────────────────────────────────
