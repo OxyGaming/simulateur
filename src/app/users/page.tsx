@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/server/auth/guard';
 import { listUsers } from '@/server/repositories/users';
+import { listAccessRequests } from '@/server/repositories/accessRequests';
 import { UsersDashboard } from './UsersDashboard';
 
 export const runtime = 'nodejs';
@@ -13,6 +14,7 @@ export default async function UsersPage() {
     <UsersDashboard
       currentUserId={user.id}
       initialUsers={listUsers()}
+      initialAccessRequests={listAccessRequests()}
     />
   );
 }

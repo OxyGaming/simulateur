@@ -1,7 +1,10 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, usersApi, type UserSummary } from '@/lib/api-client';
+import {
+  ApiError, accessRequestsApi, usersApi,
+  type AccessRequestSummary, type UserSummary,
+} from '@/lib/api-client';
 
 function fmtDate(ms: number | null): string {
   if (!ms) return '—';
@@ -10,18 +13,47 @@ function fmtDate(ms: number | null): string {
 }
 
 export function UsersDashboard({
-  currentUserId, initialUsers,
+  currentUserId, initialUsers, initialAccessRequests,
 }: {
   currentUserId: string;
   initialUsers:  UserSummary[];
+  initialAccessRequests: AccessRequestSummary[];
 }) {
   const router = useRouter();
   const [users, setUsers]    = useState(initialUsers);
+  const [requests, setRequests] = useState(initialAccessRequests);
   const [email, setEmail]    = useState('');
   const [name, setName]      = useState('');
   const [pwd, setPwd]        = useState('');
   const [busy, setBusy]      = useState(false);
+  const [busyReq, setBusyReq] = useState<string | null>(null);
   const [msg, setMsg]        = useState<{ kind: 'err' | 'ok'; text: string } | null>(null);
+
+  const pendingRequests = requests.filter(r => r.status === 'pending');
+
+  async function onApprove(req: AccessRequestSummary) {
+    setBusyReq(req.id); setMsg(null);
+    try {
+      await accessRequestsApi.approve(req.id);
+      setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved' } : r));
+      router.refresh();
+      setMsg({ kind: 'ok', text: `Demande de ${req.email} approuvée — compte créé.` });
+    } catch (e) {
+      setMsg({ kind: 'err', text: errMsg(e) });
+    } finally { setBusyReq(null); }
+  }
+
+  async function onReject(req: AccessRequestSummary) {
+    if (!confirm(`Rejeter la demande de ${req.email} ?`)) return;
+    setBusyReq(req.id); setMsg(null);
+    try {
+      await accessRequestsApi.reject(req.id);
+      setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'rejected' } : r));
+      setMsg({ kind: 'ok', text: `Demande de ${req.email} rejetée.` });
+    } catch (e) {
+      setMsg({ kind: 'err', text: errMsg(e) });
+    } finally { setBusyReq(null); }
+  }
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -57,6 +89,45 @@ export function UsersDashboard({
 
         {msg && (
           <div style={msg.kind === 'err' ? s.errBox : s.okBox}>{msg.text}</div>
+        )}
+
+        {pendingRequests.length > 0 && (
+          <section style={{ marginBottom: 32 }}>
+            <h2 style={s.h2}>
+              Demandes d&apos;accès en attente
+              <span style={s.badge}>{pendingRequests.length}</span>
+            </h2>
+            <div style={s.reqList}>
+              {pendingRequests.map(r => (
+                <div key={r.id} style={s.reqCard}>
+                  <div style={s.reqHead}>
+                    <div>
+                      <div style={s.reqName}>{r.firstName} {r.lastName}</div>
+                      <div style={s.reqEmail}>{r.email}</div>
+                    </div>
+                    <div style={s.reqDate}>{fmtDate(r.createdAt)}</div>
+                  </div>
+                  <div style={s.reqReason}>{r.reason}</div>
+                  <div style={s.reqActions}>
+                    <button
+                      onClick={() => onApprove(r)}
+                      disabled={busyReq === r.id}
+                      style={s.primary}
+                    >
+                      {busyReq === r.id ? '…' : 'Approuver'}
+                    </button>
+                    <button
+                      onClick={() => onReject(r)}
+                      disabled={busyReq === r.id}
+                      style={s.danger}
+                    >
+                      Rejeter
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         <form onSubmit={onCreate} style={s.form}>
@@ -172,6 +243,29 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none', borderRadius: 6, color: 'white', cursor: 'pointer',
     fontSize: 13, fontWeight: 600,
   },
+  danger: {
+    padding: '10px 14px', background: 'transparent', border: '1px solid #b91c1c',
+    borderRadius: 6, color: '#fca5a5', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+  },
+  badge: {
+    display: 'inline-block', marginLeft: 8, padding: '2px 8px',
+    background: '#1e40af', color: '#dbeafe', fontSize: 11,
+    borderRadius: 10, fontWeight: 700, verticalAlign: 'middle',
+  },
+  reqList: { display: 'flex', flexDirection: 'column', gap: 12 },
+  reqCard: {
+    background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8,
+    padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10,
+  },
+  reqHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
+  reqName: { fontWeight: 600, fontSize: 14, color: '#f1f5f9' },
+  reqEmail: { color: '#94a3b8', fontSize: 13, marginTop: 2 },
+  reqDate: { color: '#64748b', fontSize: 12 },
+  reqReason: {
+    background: '#0a0f1e', border: '1px solid #1e293b', borderRadius: 6,
+    padding: '8px 10px', color: '#cbd5e1', fontSize: 13, whiteSpace: 'pre-wrap',
+  },
+  reqActions: { display: 'flex', gap: 8 },
   linkBtn: {
     background: 'transparent', border: 'none', color: '#60a5fa',
     cursor: 'pointer', fontSize: 13, padding: '6px 10px',

@@ -43,3 +43,14 @@ export const CreateUserSchema = z.object({
   displayName: z.string().max(120).optional().nullable(),
 });
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+
+// ─── Access requests (formulaire "Demande d'accès" sur la page de login) ─────
+
+export const AccessRequestSchema = z.object({
+  firstName: z.string().trim().min(1).max(80),
+  lastName:  z.string().trim().min(1).max(80),
+  email:     z.string().email().max(254),
+  password:  z.string().min(8).max(200),
+  reason:    z.string().trim().min(10).max(2000),
+});
+export type AccessRequestInput = z.infer<typeof AccessRequestSchema>;

@@ -15,7 +15,11 @@ export async function currentUser(): Promise<User | null> {
   const row = db.select().from(users).where(eq(users.id, session.userId)).get();
   if (!row) {
     // Session orpheline — user supprimé mais cookie toujours présent.
-    await session.destroy();
+    // Next.js 15 interdit la modification de cookies depuis un Server Component
+    // (et currentUser est appelé depuis page.tsx). On tente la destruction sans
+    // bloquer le rendu : si on n'est pas dans une Route Handler / Server Action,
+    // la session restera jusqu'à expiration ou prochain logout — inoffensif.
+    try { await session.destroy(); } catch { /* read-only cookie context */ }
     return null;
   }
   return row;

@@ -86,6 +86,13 @@ export const authApi = {
   logout: () =>
     request<{ ok: true }>('/api/v1/auth/logout', { method: 'POST' }),
   me:     () => request<AuthUser>('/api/v1/auth/me'),
+  requestAccess: (input: {
+    firstName: string; lastName: string; email: string;
+    password: string; reason: string;
+  }) =>
+    request<{ ok: true }>('/api/v1/auth/request-access', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
 };
 
 // ─── Layouts ──────────────────────────────────────────────────────────────────
@@ -142,4 +149,20 @@ export const usersApi = {
     request<UserSummary>('/api/v1/users', {
       method: 'POST', body: JSON.stringify(input),
     }),
+};
+
+// ─── Access requests (côté admin/formateur) ──────────────────────────────────
+
+export type AccessRequestSummary = {
+  id: string; email: string; firstName: string; lastName: string;
+  reason: string; status: 'pending' | 'approved' | 'rejected';
+  createdAt: number; reviewedAt: number | null; reviewedBy: string | null;
+};
+
+export const accessRequestsApi = {
+  list:    () => request<AccessRequestSummary[]>('/api/v1/access-requests'),
+  approve: (id: string) =>
+    request<{ ok: true }>(`/api/v1/access-requests/${encodeURIComponent(id)}/approve`, { method: 'POST' }),
+  reject:  (id: string) =>
+    request<{ ok: true }>(`/api/v1/access-requests/${encodeURIComponent(id)}/reject`, { method: 'POST' }),
 };

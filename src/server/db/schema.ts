@@ -41,9 +41,31 @@ export const layoutSnapshots = sqliteTable('layout_snapshots', {
   layoutTimeIdx: index('idx_snapshots_layout_time').on(t.layoutId, t.createdAt),
 }));
 
+// ─── access_requests (demandes de création de compte) ────────────────────────
+// Une demande contient déjà le hash du mot de passe choisi par le demandeur :
+// à l'approbation, on crée le user sans devoir lui renvoyer un mot de passe
+// initial. Statut : pending → approved | rejected (transition unique).
+export const accessRequests = sqliteTable('access_requests', {
+  id:           text('id').primaryKey(),
+  email:        text('email').notNull(),
+  firstName:    text('first_name').notNull(),
+  lastName:     text('last_name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  reason:       text('reason').notNull(),
+  status:       text('status').notNull().default('pending'),
+  createdAt:    integer('created_at').notNull(),
+  reviewedAt:   integer('reviewed_at'),
+  reviewedBy:   text('reviewed_by').references(() => users.id),
+}, (t) => ({
+  statusIdx: index('idx_access_requests_status').on(t.status),
+  emailIdx:  index('idx_access_requests_email').on(t.email),
+}));
+
 export type User            = typeof users.$inferSelect;
 export type NewUser         = typeof users.$inferInsert;
 export type Layout          = typeof layouts.$inferSelect;
 export type NewLayout       = typeof layouts.$inferInsert;
 export type LayoutSnapshot  = typeof layoutSnapshots.$inferSelect;
 export type NewSnapshot     = typeof layoutSnapshots.$inferInsert;
+export type AccessRequest   = typeof accessRequests.$inferSelect;
+export type NewAccessRequest = typeof accessRequests.$inferInsert;
