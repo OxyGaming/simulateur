@@ -11,7 +11,7 @@ function emptyPayload(): LayoutPayload {
   return {
     schemaVersion: LAYOUT_SCHEMA_VERSION,
     nodes: [], edges: [], zones: [], signals: [], switches: [],
-    textLabels: [], pupitreLabels: [], routes: {}, panelButtons: {},
+    textLabels: [], ronds: [], pupitreLabels: [], routes: {}, panelButtons: {},
   };
 }
 

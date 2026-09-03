@@ -113,6 +113,24 @@ export interface TextLabel {
   fontSize: number;
 }
 
+/**
+ * Rond — repère circulaire libre sur le TCO.
+ *
+ * Représente une origine ou une destination d'itinéraire telle qu'elle apparaît
+ * sur un plan de voie PRS (petits ronds étiquetés : DV, AV, P1, 1S, 2S…).
+ * Purement visuel : un rond ne porte aucune logique d'enclenchement — il sert
+ * de repère pour l'agent et documente les origines/destinations du poste.
+ */
+export interface Rond {
+  id: string;
+  /** Étiquette affichée au centre du rond (ex. "DV", "P1", "1S"). */
+  text: string;
+  x: number;
+  y: number;
+  /** Rayon en px. */
+  r: number;
+}
+
 // ─── Route + Pupitre PRS ─────────────────────────────────────────────────────
 
 /**
@@ -312,6 +330,7 @@ export type EditorMode =
   | 'addSignal'  // place a signal on an edge       (S)
   | 'addSwitch'  // place a switch on a node        (A)
   | 'addText'    // free text annotation            (T)
+  | 'addRond'    // place a route origin/dest circle (O)
   | 'editZone'   // assign edges to CDV zones       (W)
   | 'addTrain';  // place simulation train on edge  (X)
 
@@ -346,4 +365,5 @@ export type SelectedObject =
   | { type: 'signal';    id: string }
   | { type: 'switch';    id: string }
   | { type: 'textLabel'; id: string }
+  | { type: 'rond';      id: string }
   | null;

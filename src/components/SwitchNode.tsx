@@ -1,6 +1,6 @@
 'use client';
 import { Switch, Node } from '@/types/railway';
-import { getSwitchAnchor, Point } from '@/lib/geometry';
+import { getSwitchAnchor, quadraticControlPoint, bezierBranchPoints, Point } from '@/lib/geometry';
 
 const BRANCH_LEN   = 30;
 const CENTER_R     = 6;
@@ -13,11 +13,23 @@ const COLOR_ENTRY        = '#94a3b8';
 const COLOR_SELECTED     = '#4ade80';
 const COLOR_LOCKED       = '#f59e0b';
 
-function branchEnd(anchor: Point, target: Node): Point {
-  const dx = target.x - anchor.x;
-  const dy = target.y - anchor.y;
-  const d  = Math.sqrt(dx * dx + dy * dy) || 1;
-  return { x: anchor.x + (dx / d) * BRANCH_LEN, y: anchor.y + (dy / d) * BRANCH_LEN };
+/**
+ * Géométrie d'une branche = le tronçon (CDV) associé, décrit par ses deux
+ * extrémités (centres de nœuds), sa courbure et le fait que l'aiguille soit à
+ * l'extrémité de départ (p1) ou d'arrivée (p2).
+ */
+export interface BranchGeom {
+  p1: Point;
+  p2: Point;
+  curveOffset: number;
+  atStart: boolean;
+}
+
+/** Chemin SVG d'une branche, suivant la courbure du CDV sur BRANCH_LEN. */
+function branchPathD(geom: BranchGeom): string {
+  const cp = quadraticControlPoint(geom.p1, geom.p2, geom.curveOffset);
+  const pts = bezierBranchPoints(geom.atStart, geom.p1, cp, geom.p2, BRANCH_LEN);
+  return 'M ' + pts.map(p => `${p.x} ${p.y}`).join(' L ');
 }
 
 /** Contrôle la visibilité des branches en vue apprenant.
@@ -30,9 +42,9 @@ export type SwitchBranchVisibility = 'full' | 'hidden' | 'active-only';
 interface SwitchNodeProps {
   sw: Switch;
   node: Node;
-  entryNode:     Node | null;
-  straightNode:  Node | null;
-  divergingNode: Node | null;
+  entryBranch:     BranchGeom | null;
+  straightBranch:  BranchGeom | null;
+  divergingBranch: BranchGeom | null;
   isSelected: boolean;
   diAlarmActive: boolean;
   branchVisibility?: SwitchBranchVisibility;
@@ -41,14 +53,14 @@ interface SwitchNodeProps {
 }
 
 export function SwitchNode({
-  sw, node, entryNode, straightNode, divergingNode,
+  sw, node, entryBranch, straightBranch, divergingBranch,
   isSelected, diAlarmActive, branchVisibility = 'full', onClick, onLabelMouseDown,
 }: SwitchNodeProps) {
   const anchor = getSwitchAnchor(node);
 
-  const entryTip     = entryNode     ? branchEnd(anchor, entryNode)     : null;
-  const straightTip  = straightNode  ? branchEnd(anchor, straightNode)  : null;
-  const divergingTip = divergingNode ? branchEnd(anchor, divergingNode) : null;
+  const entryPath     = entryBranch     ? branchPathD(entryBranch)     : null;
+  const straightPath  = straightBranch  ? branchPathD(straightBranch)  : null;
+  const divergingPath = divergingBranch ? branchPathD(divergingBranch) : null;
 
   // Visibilité des branches selon le mode
   function isBranchVisible(branch: 'straight' | 'diverging'): boolean {
@@ -82,19 +94,19 @@ export function SwitchNode({
           fill="none" stroke={COLOR_SELECTED} strokeWidth={1.5} opacity={0.7} pointerEvents="none" />
       )}
 
-      {entryTip && (
-        <line x1={anchor.x} y1={anchor.y} x2={entryTip.x} y2={entryTip.y}
-          stroke={COLOR_ENTRY} strokeWidth={3} strokeLinecap="round" pointerEvents="none" />
+      {entryPath && (
+        <path d={entryPath} fill="none"
+          stroke={COLOR_ENTRY} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
       )}
-      {straightTip && isBranchVisible('straight') && (
-        <line x1={anchor.x} y1={anchor.y} x2={straightTip.x} y2={straightTip.y}
+      {straightPath && isBranchVisible('straight') && (
+        <path d={straightPath} fill="none"
           stroke={branchColor('straight')} strokeWidth={branchWidth('straight')}
-          strokeLinecap="round" pointerEvents="none" />
+          strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
       )}
-      {divergingTip && isBranchVisible('diverging') && (
-        <line x1={anchor.x} y1={anchor.y} x2={divergingTip.x} y2={divergingTip.y}
+      {divergingPath && isBranchVisible('diverging') && (
+        <path d={divergingPath} fill="none"
           stroke={branchColor('diverging')} strokeWidth={branchWidth('diverging')}
-          strokeLinecap="round" pointerEvents="none" />
+          strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
       )}
 
       <circle cx={anchor.x} cy={anchor.y} r={CENTER_R}

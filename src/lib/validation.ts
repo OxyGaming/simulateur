@@ -1,4 +1,4 @@
-import { Node, Edge, Zone, Signal, Switch, TextLabel, Route, PanelButton, ReflexionDevice } from '@/types/railway';
+import { Node, Edge, Zone, Signal, Switch, TextLabel, Rond, Route, PanelButton, ReflexionDevice } from '@/types/railway';
 
 // ─── Layout data (new format) ─────────────────────────────────────────────────
 
@@ -9,6 +9,8 @@ export interface LayoutData {
   signals: Signal[];
   switches: Switch[];
   textLabels?: TextLabel[];
+  /** Repères circulaires (origines/destinations d'itinéraires) — purement visuels. */
+  ronds?: Rond[];
   /** Itinéraires PRS configurés (logique métier pure, sans état runtime). */
   routes?: Record<string, Route>;
   /** Boutons du pupitre PRS (configuration + dispositifs de réflexion). États remis à idle à l'import. */
@@ -91,6 +93,18 @@ function isTextLabel(v: unknown): v is TextLabel {
     typeof o.x === 'number' &&
     typeof o.y === 'number' &&
     typeof o.fontSize === 'number' && (o.fontSize as number) >= 6
+  );
+}
+
+function isRond(v: unknown): v is Rond {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.id === 'string' && o.id.length > 0 &&
+    typeof o.text === 'string' &&
+    typeof o.x === 'number' &&
+    typeof o.y === 'number' &&
+    typeof o.r === 'number' && (o.r as number) > 0
   );
 }
 
@@ -318,6 +332,9 @@ export function validateLayout(json: string): ValidationResult {
   const rawTextLabels = Array.isArray(obj.textLabels) ? (obj.textLabels as unknown[]) : [];
   const textLabels = rawTextLabels.filter(isTextLabel);
 
+  const rawRonds = Array.isArray(obj.ronds) ? (obj.ronds as unknown[]) : [];
+  const ronds = rawRonds.filter(isRond);
+
   // ── Routes ────────────────────────────────────────────────────────────────
   let routes: Record<string, Route> | undefined;
   if (obj.routes !== undefined) {
@@ -372,7 +389,7 @@ export function validateLayout(json: string): ValidationResult {
   }
 
   return {
-    data: { nodes, edges: validEdges, zones: validZones, signals: validSignals, switches: validSwitches, textLabels, routes, panelButtons },
+    data: { nodes, edges: validEdges, zones: validZones, signals: validSignals, switches: validSwitches, textLabels, ronds, routes, panelButtons },
     warnings,
   };
 }

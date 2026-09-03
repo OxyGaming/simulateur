@@ -48,6 +48,7 @@ export function PropertiesPanel() {
   const deleteNode       = useRailwayStore(s => s.deleteNode);
   const updateEdge       = useRailwayStore(s => s.updateEdge);
   const deleteEdge       = useRailwayStore(s => s.deleteEdge);
+  const splitEdge        = useRailwayStore(s => s.splitEdge);
   const updateZone         = useRailwayStore(s => s.updateZone);
   const deleteZone         = useRailwayStore(s => s.deleteZone);
   const assignEdgeToZone   = useRailwayStore(s => s.assignEdgeToZone);
@@ -63,6 +64,9 @@ export function PropertiesPanel() {
   const setSwitchDiscordance = useRailwayStore(s => s.setSwitchDiscordance);
   const updateTextLabel  = useRailwayStore(s => s.updateTextLabel);
   const deleteTextLabel  = useRailwayStore(s => s.deleteTextLabel);
+  const ronds            = useRailwayStore(s => s.ronds);
+  const updateRond       = useRailwayStore(s => s.updateRond);
+  const deleteRond       = useRailwayStore(s => s.deleteRond);
   const addZone          = useRailwayStore(s => s.addZone);
 
   // ── Node panel ──────────────────────────────────────────────────────────────
@@ -199,6 +203,13 @@ export function PropertiesPanel() {
         <p style={s.hint}>Glissez la poignée bleue pour courber · Outil Signal + clic pour ajouter un signal</p>
 
         <Divider />
+        <button
+          onClick={() => splitEdge(edge.id)}
+          style={{ ...s.stateBtn, background: '#0c2a3a', color: '#38bdf8', borderColor: '#0e4d6e', textAlign: 'center', marginBottom: 8 }}
+          title="Insère un nœud au milieu et coupe le tronçon en deux"
+        >
+          ✂ Diviser en 2
+        </button>
         <DeleteButton onClick={() => deleteEdge(edge.id)} />
       </aside>
     );
@@ -790,6 +801,58 @@ export function PropertiesPanel() {
     );
   }
 
+  // ── Rond panel ────────────────────────────────────────────────────────────────
+
+  if (selection?.type === 'rond') {
+    const rond = ronds.find(r => r.id === selection.id);
+    if (!rond) return null;
+
+    return (
+      <aside style={s.panel}>
+        <h3 style={s.title}>Rond (origine / destination)</h3>
+        <Divider />
+
+        <Field label="Étiquette">
+          <input value={rond.text}
+            onChange={e => updateRond(rond.id, { text: e.target.value })}
+            style={s.input} />
+        </Field>
+
+        <Field label="Rayon (px)">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="range" min={6} max={40} step={1} value={rond.r}
+              onChange={e => updateRond(rond.id, { r: Number(e.target.value) })}
+              style={{ flex: 1, accentColor: '#4a90d9' }} />
+            <input type="number" min={6} max={40} value={rond.r}
+              onChange={e => updateRond(rond.id, { r: Math.max(6, Math.min(40, Number(e.target.value))) })}
+              style={{ ...s.input, width: 52 }} />
+          </div>
+        </Field>
+
+        <Field label="Position">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div>
+              <label style={s.label}>X</label>
+              <input type="number" value={Math.round(rond.x)}
+                onChange={e => updateRond(rond.id, { x: Number(e.target.value) })}
+                style={s.input} />
+            </div>
+            <div>
+              <label style={s.label}>Y</label>
+              <input type="number" value={Math.round(rond.y)}
+                onChange={e => updateRond(rond.id, { y: Number(e.target.value) })}
+                style={s.input} />
+            </div>
+          </div>
+        </Field>
+
+        <Divider />
+        <DeleteButton onClick={() => deleteRond(rond.id)} />
+        <p style={s.hint}>Raccourci : Suppr. · Glissez pour déplacer</p>
+      </aside>
+    );
+  }
+
   // ── Empty state ─────────────────────────────────────────────────────────────
 
   const modeHints: Record<string, string> = {
@@ -799,6 +862,7 @@ export function PropertiesPanel() {
     addSignal: 'Cliquez sur un tronçon\npour y ajouter un signal.',
     addSwitch: 'Cliquez sur un nœud pour y poser une aiguille.\n\nUn nœud ne peut porter qu\'une seule aiguille.',
     addText:   'Cliquez sur le canvas pour placer\nun texte libre.',
+    addRond:   'Cliquez sur le canvas pour placer\nun rond (origine / destination d\'itinéraire).',
     editZone:  'Sélectionnez une zone CDV (clic sur son badge),\npuis cliquez sur un tronçon\npour l\'ajouter ou l\'en retirer.',
   };
 

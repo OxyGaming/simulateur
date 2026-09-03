@@ -8,6 +8,7 @@ import { EdgeLine }    from './ConnectionLine';
 import { SignalNode }  from './SignalNode';
 import { SwitchNode, SwitchBranchVisibility }  from './SwitchNode';
 import { TextLabelNode } from './TextLabelNode';
+import { RondNode } from './RondNode';
 import { ZoneBadge, zoneColor } from './ZoneBadge';
 import { TrainMarker } from './TrainMarker';
 
@@ -126,6 +127,7 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const signals        = useRailwayStore(s => s.signals);
   const switches       = useRailwayStore(s => s.switches);
   const textLabels     = useRailwayStore(s => s.textLabels);
+  const ronds          = useRailwayStore(s => s.ronds);
 
   // ── Fit-to-view ─────────────────────────────────────────────────────────────
   // Bounding box du contenu (nodes + textLabels) — utilisé pour centrer et
@@ -134,7 +136,7 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   // une partie est hors champ et l'apprenant ne sait pas dans quelle direction
   // panner pour la retrouver.
   const contentBounds = useMemo(() => {
-    if (nodes.length === 0 && textLabels.length === 0) return null;
+    if (nodes.length === 0 && textLabels.length === 0 && ronds.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const n of nodes) {
       if (n.x < minX) minX = n.x;
@@ -148,9 +150,15 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
       if (t.x > maxX) maxX = t.x;
       if (t.y > maxY) maxY = t.y;
     }
+    for (const r of ronds) {
+      if (r.x - r.r < minX) minX = r.x - r.r;
+      if (r.y - r.r < minY) minY = r.y - r.r;
+      if (r.x + r.r > maxX) maxX = r.x + r.r;
+      if (r.y + r.r > maxY) maxY = r.y + r.r;
+    }
     if (!Number.isFinite(minX)) return null;
     return { minX, minY, maxX, maxY };
-  }, [nodes, textLabels]);
+  }, [nodes, textLabels, ronds]);
 
   const fitToView = useCallback(() => {
     const el = svgRef.current;
@@ -219,6 +227,7 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
     nodeCursor,
     edgeCursor,
     textLabelCursor,
+    rondCursor,
     svgHandlers,
   } = interaction;
 
@@ -235,6 +244,54 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const onSwitchClick         = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onSwitchClick;
   const onTextLabelMouseDown  = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelMouseDown;
   const onTextLabelClick      = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onTextLabelClick;
+  const onRondMouseDown       = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onRondMouseDown;
+  const onRondClick           = readOnly ? (_id: string, _e: React.MouseEvent) => {} : interaction.onRondClick;
+
+  // ── Pan de la vue par glisser du fond ─────────────────────────────────────────
+  // Un glisser démarré sur le fond (le <svg> lui-même, pas un objet) déplace la vue.
+  // Sous le seuil de mouvement, le geste reste un clic (désélection / placement).
+  const panRef = useRef<{ cx: number; cy: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  function onSvgMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    if (e.button !== 0) return;               // bouton gauche seulement
+    if (e.target !== e.currentTarget) return; // uniquement le fond
+    panRef.current = { cx: e.clientX, cy: e.clientY, panX: vp.panX, panY: vp.panY, moved: false };
+  }
+
+  function onSvgMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    const pan = panRef.current;
+    if (pan) {
+      const dx = e.clientX - pan.cx;
+      const dy = e.clientY - pan.cy;
+      if (!pan.moved) {
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) { svgHandlers.onMouseMove(e); return; }
+        pan.moved = true;
+        setIsPanning(true);
+      }
+      setVp(prev => ({ ...prev, panX: pan.panX + dx, panY: pan.panY + dy }));
+      return;
+    }
+    svgHandlers.onMouseMove(e);
+  }
+
+  function onSvgMouseUp() {
+    if (isPanning) setIsPanning(false);
+    svgHandlers.onMouseUp();
+  }
+
+  function onSvgMouseLeave() {
+    panRef.current = null;
+    if (isPanning) setIsPanning(false);
+    svgHandlers.onMouseLeave();
+  }
+
+  function onSvgClickWrapped(e: React.MouseEvent<SVGSVGElement>) {
+    const pan = panRef.current;
+    panRef.current = null;
+    if (pan && pan.moved) return; // un pan ne doit pas désélectionner / placer
+    svgHandlers.onClick(e);
+  }
 
   // Pre-compute edge→zone colour mapping
   const edgeZoneMap = new Map<string, { zoneId: string; colorIndex: number }>();
@@ -361,10 +418,14 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
       style={{
         display: 'block',
         background: '#111827',
-        cursor: readOnly ? 'default' : canvasCursor,
+        cursor: isPanning ? 'grabbing' : (canvasCursor === 'crosshair' ? 'crosshair' : 'grab'),
         touchAction: readOnly ? 'none' : 'auto',
       }}
-      {...svgHandlers}
+      onMouseDown={onSvgMouseDown}
+      onMouseMove={onSvgMouseMove}
+      onMouseUp={onSvgMouseUp}
+      onMouseLeave={onSvgMouseLeave}
+      onClick={onSvgClickWrapped}
     >
       <defs>
         <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -486,12 +547,21 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
         const node = nodes.find(n => n.id === sw.nodeId);
         if (!node) return null;
 
-        function otherNode(edgeId: string | null) {
+        // Géométrie d'une branche = son tronçon (mêmes extrémités et courbure),
+        // pour que la matérialisation suive la courbure du CDV associé.
+        function branchGeom(edgeId: string | null) {
           if (!edgeId) return null;
           const edge = edges.find(e => e.id === edgeId);
           if (!edge) return null;
-          const otherId = edge.fromNodeId === sw.nodeId ? edge.toNodeId : edge.fromNodeId;
-          return nodes.find(n => n.id === otherId) ?? null;
+          const fromNode = nodes.find(n => n.id === edge.fromNodeId);
+          const toNode   = nodes.find(n => n.id === edge.toNodeId);
+          if (!fromNode || !toNode) return null;
+          return {
+            p1: nodeCenter(fromNode),
+            p2: nodeCenter(toNode),
+            curveOffset: edge.curveOffset ?? 0,
+            atStart: edge.fromNodeId === sw.nodeId,
+          };
         }
 
         const branchVisibility: SwitchBranchVisibility = readOnly
@@ -503,9 +573,9 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
             key={sw.id}
             sw={sw}
             node={node}
-            entryNode={otherNode(sw.entryEdgeId)}
-            straightNode={otherNode(sw.straightEdgeId)}
-            divergingNode={otherNode(sw.divergingEdgeId)}
+            entryBranch={branchGeom(sw.entryEdgeId)}
+            straightBranch={branchGeom(sw.straightEdgeId)}
+            divergingBranch={branchGeom(sw.divergingEdgeId)}
             isSelected={selection?.type === 'switch' && selection.id === sw.id}
             diAlarmActive={diAlarmActive}
             branchVisibility={branchVisibility}
@@ -581,6 +651,18 @@ export function TcoCanvas({ readOnly = false }: { readOnly?: boolean }) {
           opacity={0.7}
         />
       )}
+
+      {/* ── Ronds (repères origine/destination — couche haute) ────────────── */}
+      {ronds.map(rond => (
+        <RondNode
+          key={rond.id}
+          rond={rond}
+          isSelected={selection?.type === 'rond' && selection.id === rond.id}
+          cursor={rondCursor}
+          onMouseDown={(e) => onRondMouseDown(rond.id, e)}
+          onClick={(e) => onRondClick(rond.id, e)}
+        />
+      ))}
 
       </g>{/* end zoomable group */}
     </svg>

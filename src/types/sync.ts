@@ -1,5 +1,5 @@
 import type {
-  Node, Edge, Zone, Signal, Switch, TextLabel,
+  Node, Edge, Zone, Signal, Switch, TextLabel, Rond,
   PupitreLabel, Route, PanelButton, RouteInterlockingState, Train,
   ReflexionDevice,
 } from './railway';
@@ -15,6 +15,7 @@ export interface SyncSnapshot {
   signals:       Signal[];
   switches:      Switch[];
   textLabels:    TextLabel[];
+  ronds:         Rond[];
   pupitreLabels: PupitreLabel[];
   routes:        Record<string, Route>;
   panelButtons:  Record<string, PanelButton>;

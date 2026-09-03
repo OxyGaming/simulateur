@@ -9,6 +9,7 @@ import { LabelOffset } from '@/types/railway';
 type DragState =
   | { kind: 'node';      id: string; startMouseX: number; startMouseY: number; startX: number; startY: number }
   | { kind: 'textLabel'; id: string; startMouseX: number; startMouseY: number; startX: number; startY: number }
+  | { kind: 'rond';      id: string; startMouseX: number; startMouseY: number; startX: number; startY: number }
   | { kind: 'diIndicator'; startMouseX: number; startMouseY: number; startX: number; startY: number }
   | { kind: 'label';
       objectType: 'node' | 'signal' | 'switch' | 'zone' | 'signalZapEap';
@@ -58,6 +59,7 @@ export function useCanvasInteraction(
         if (e.key === 's' || e.key === 'S') { store().setMode('addSignal'); return; }
         if (e.key === 'a' || e.key === 'A') { store().setMode('addSwitch'); return; }
         if (e.key === 't' || e.key === 'T') { store().setMode('addText');   return; }
+        if (e.key === 'o' || e.key === 'O') { store().setMode('addRond');   return; }
         if (e.key === 'w' || e.key === 'W') { store().setMode('editZone');  return; }
         if (e.key === 'x' || e.key === 'X') { store().setMode('addTrain');  return; }
 
@@ -71,6 +73,7 @@ export function useCanvasInteraction(
           else if (sel.type === 'signal')    s.deleteSignal(sel.id);
           else if (sel.type === 'switch')    s.deleteSwitch(sel.id);
           else if (sel.type === 'textLabel') s.deleteTextLabel(sel.id);
+          else if (sel.type === 'rond')      s.deleteRond(sel.id);
         }
       }
     };
@@ -104,6 +107,8 @@ export function useCanvasInteraction(
       store().addNode(p.x, p.y);
     } else if (mode === 'addText') {
       store().addTextLabel(p.x, p.y);
+    } else if (mode === 'addRond') {
+      store().addRond(p.x, p.y);
     } else if (mode === 'select' || mode === 'editZone' || mode === 'addTrain') {
       store().setSelection(null);
     } else if (mode === 'addEdge') {
@@ -148,6 +153,9 @@ export function useCanvasInteraction(
         break;
       case 'textLabel':
         store().updateTextLabel(drag.id, { x: drag.startX + dx, y: drag.startY + dy });
+        break;
+      case 'rond':
+        store().updateRond(drag.id, { x: drag.startX + dx, y: drag.startY + dy });
         break;
       case 'diIndicator':
         store().setDiIndicatorPos({ x: drag.startX + dx, y: drag.startY + dy });
@@ -315,10 +323,28 @@ export function useCanvasInteraction(
     store().setSelection({ type: 'textLabel', id });
   }
 
+  // ── Rond interactions ────────────────────────────────────────────────────────
+
+  function onRondMouseDown(id: string, e: React.MouseEvent) {
+    if (mode !== 'select') return;
+    e.stopPropagation();
+    const rond = store().ronds.find(r => r.id === id);
+    if (!rond) return;
+    const p = getSvgPoint(e);
+    dragRef.current = { kind: 'rond', id, startMouseX: p.x, startMouseY: p.y, startX: rond.x, startY: rond.y };
+    wasDraggedRef.current = false;
+  }
+
+  function onRondClick(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (wasDraggedRef.current) { wasDraggedRef.current = false; return; }
+    store().setSelection({ type: 'rond', id });
+  }
+
   // ── Cursors ─────────────────────────────────────────────────────────────────
 
   const canvasCursor: React.CSSProperties['cursor'] =
-    mode === 'addNode' || mode === 'addSignal' || mode === 'addText' || mode === 'addTrain' ? 'crosshair' : 'default';
+    mode === 'addNode' || mode === 'addSignal' || mode === 'addText' || mode === 'addRond' || mode === 'addTrain' ? 'crosshair' : 'default';
 
   const nodeCursor: React.CSSProperties['cursor'] =
     mode === 'select'   ? 'move'
@@ -332,12 +358,16 @@ export function useCanvasInteraction(
   const textLabelCursor: React.CSSProperties['cursor'] =
     mode === 'select' ? 'move' : 'default';
 
+  const rondCursor: React.CSSProperties['cursor'] =
+    mode === 'select' ? 'move' : 'default';
+
   return {
     mousePos,
     canvasCursor,
     nodeCursor,
     edgeCursor,
     textLabelCursor,
+    rondCursor,
     svgHandlers: {
       onClick:      onSvgClick,
       onMouseMove:  onMouseMove,
@@ -355,5 +385,7 @@ export function useCanvasInteraction(
     onSwitchClick,
     onTextLabelMouseDown,
     onTextLabelClick,
+    onRondMouseDown,
+    onRondClick,
   };
 }

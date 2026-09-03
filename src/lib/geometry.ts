@@ -69,6 +69,41 @@ export function quadraticBezierTangent(t: number, p1: Point, cp: Point, p2: Poin
   };
 }
 
+/**
+ * Points le long du début d'un tronçon courbe, depuis l'une de ses extrémités.
+ *
+ * Sert à matérialiser une branche d'aiguille en suivant la courbure du CDV
+ * associé : au lieu d'un segment droit pointant vers le nœud opposé, on
+ * échantillonne la bezier du tronçon sur une longueur d'arc `len`.
+ *
+ * atStart=true  → on part de p1 (t croissant)
+ * atStart=false → on part de p2 (t décroissant)
+ * Retourne au moins 2 points (dont l'extrémité de départ).
+ */
+export function bezierBranchPoints(
+  atStart: boolean, p1: Point, cp: Point, p2: Point, len: number, steps = 24,
+): Point[] {
+  const start = quadraticBezierPoint(atStart ? 0 : 1, p1, cp, p2);
+  const pts: Point[] = [start];
+  let prev = start;
+  let acc = 0;
+  for (let i = 1; i <= steps; i++) {
+    const tt = i / steps;
+    const t = atStart ? tt : 1 - tt;
+    const p = quadraticBezierPoint(t, p1, cp, p2);
+    const d = Math.hypot(p.x - prev.x, p.y - prev.y);
+    if (acc + d >= len) {
+      const r = d === 0 ? 0 : (len - acc) / d;
+      pts.push({ x: prev.x + (p.x - prev.x) * r, y: prev.y + (p.y - prev.y) * r });
+      return pts;
+    }
+    acc += d;
+    pts.push(p);
+    prev = p;
+  }
+  return pts;
+}
+
 /** Finds the closest parameter t on a quadratic bezier to point p (coarse sampling). */
 export function closestTOnBezier(
   p: Point, p1: Point, cp: Point, p2: Point,

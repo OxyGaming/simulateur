@@ -91,6 +91,17 @@ const MODES: { mode: EditorMode; label: string; shortcut: string; icon: React.Re
     ),
   },
   {
+    mode: 'addRond',
+    label: 'Rond',
+    shortcut: 'O',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="7" cy="7" r="5" />
+        <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
     mode: 'addTrain',
     label: 'Train',
     shortcut: 'X',
@@ -175,7 +186,8 @@ export function Toolbar({ sessionCode, onCopyLink, onRenewCode, linkCopied }: To
           result.data.zones.length +
           result.data.signals.length +
           result.data.switches.length +
-          (result.data.textLabels?.length ?? 0);
+          (result.data.textLabels?.length ?? 0) +
+          (result.data.ronds?.length ?? 0);
         setNotif({ type: 'success', message: `Import réussi — ${total} objet(s) chargé(s).` });
       }
     };

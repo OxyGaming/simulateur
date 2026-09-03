@@ -80,6 +80,14 @@ const TextLabelSchema = z.object({
   fontSize: z.number().min(6),
 });
 
+const RondSchema = z.object({
+  id:   z.string().min(1),
+  text: z.string(),
+  x:    z.number(),
+  y:    z.number(),
+  r:    z.number().positive(),
+});
+
 const PupitreLabelSchema = z.object({
   id:   z.string().min(1),
   text: z.string(),
@@ -138,6 +146,7 @@ export const LayoutPayloadSchema = z.object({
   signals:       z.array(SignalSchema),
   switches:      z.array(SwitchSchema),
   textLabels:    z.array(TextLabelSchema).default([]),
+  ronds:         z.array(RondSchema).default([]),
   pupitreLabels: z.array(PupitreLabelSchema).default([]),
   routes:        z.record(z.string(), RouteSchema).default({}),
   panelButtons:  z.record(z.string(), PanelButtonSchema).default({}),

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import {
-  Node, Edge, Zone, Signal, Switch, TextLabel,
+  Node, Edge, Zone, Signal, Switch, TextLabel, Rond,
   Route, RouteZoneCondition, RouteInterlockingState, ZoneRole,
   PanelButton, ButtonState, PupitreLabel,
   EditorMode, SelectedObject, SignalDirection, LabelOffset, Train,
 } from '@/types/railway';
 import { LayoutData } from '@/lib/validation';
+import { quadraticControlPoint, quadraticBezierPoint } from '@/lib/geometry';
 import {
   InterlockingContext, CanFormResult,
   canFormItineraire, checkEAp, checkCIA,
@@ -664,6 +665,7 @@ interface UndoSnapshot {
   signals: Signal[];
   switches: Switch[];
   textLabels: TextLabel[];
+  ronds: Rond[];
   routes: Record<string, Route>;
   panelButtons: Record<string, PanelButton>;
   pupitreLabels: PupitreLabel[];
@@ -683,6 +685,7 @@ interface RailwayStore {
   signals: Signal[];
   switches: Switch[];
   textLabels: TextLabel[];
+  ronds: Rond[];
   pupitreLabels: PupitreLabel[];
   routes: Record<string, Route>;
   panelButtons: Record<string, PanelButton>;
@@ -732,6 +735,13 @@ interface RailwayStore {
   addEdge: (fromNodeId: string, toNodeId: string) => void;
   updateEdge: (id: string, patch: Partial<Edge>) => void;
   deleteEdge: (id: string) => void;
+  /**
+   * Divise un tronçon en deux au milieu de sa courbe : insère un nœud au point
+   * médian de la bezier et remplace le tronçon par deux moitiés qui épousent la
+   * courbe d'origine (subdivision de De Casteljau). Réaffecte zones (CDV),
+   * signaux, branches d'aiguilles, itinéraires et trains portés par le tronçon.
+   */
+  splitEdge: (id: string) => void;
 
   // ── Zone (CDV) actions ───────────────────────────────────────────────────────
   addZone: (edgeId: string) => void;
@@ -775,6 +785,11 @@ interface RailwayStore {
   addTextLabel: (x: number, y: number) => void;
   updateTextLabel: (id: string, patch: Partial<TextLabel>) => void;
   deleteTextLabel: (id: string) => void;
+
+  // ── Rond actions (repères origine/destination) ───────────────────────────────
+  addRond: (x: number, y: number) => void;
+  updateRond: (id: string, patch: Partial<Rond>) => void;
+  deleteRond: (id: string) => void;
 
   // ── PupitreLabel actions (plaques vue apprenante) ─────────────────────────────
   addPupitreLabel: (x: number, y: number) => void;
@@ -870,6 +885,7 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
     const snapshot: UndoSnapshot = {
       nodes: s.nodes, edges: s.edges, zones: s.zones,
       signals: s.signals, switches: s.switches, textLabels: s.textLabels,
+      ronds: s.ronds,
       routes: s.routes, panelButtons: s.panelButtons, pupitreLabels: s.pupitreLabels,
     };
     set(prev => ({ undoStack: [...prev.undoStack.slice(-49), snapshot] }));
@@ -882,6 +898,7 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
   signals: [],
   switches: [],
   textLabels: [],
+  ronds: [],
   pupitreLabels: [],
   routes: {},
   panelButtons: {},
@@ -975,6 +992,81 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
           divergingEdgeId: sw.divergingEdgeId === id ? null : sw.divergingEdgeId,
         })),
         selection: null,
+      };
+    });
+  },
+
+  splitEdge: (id) => {
+    saveUndo();
+    set(s => {
+      const edge = s.edges.find(e => e.id === id);
+      if (!edge) return {};
+      const A = s.nodes.find(n => n.id === edge.fromNodeId);
+      const B = s.nodes.find(n => n.id === edge.toNodeId);
+      if (!A || !B) return {};
+
+      const off = edge.curveOffset ?? 0;
+      const cp = quadraticControlPoint(A, B, off);
+      const M = quadraticBezierPoint(0.5, A, cp, B);
+      // Subdivision de De Casteljau à t=0.5 → points de contrôle des deux moitiés.
+      const leftCp  = { x: (A.x + cp.x) / 2,  y: (A.y + cp.y) / 2 };
+      const rightCp = { x: (cp.x + B.x) / 2,  y: (cp.y + B.y) / 2 };
+      // Recompose un curveOffset signé à partir d'un point de contrôle.
+      const offsetOf = (p1: {x:number;y:number}, p2: {x:number;y:number}, c: {x:number;y:number}) => {
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const px = -dy / len, py = dx / len;
+        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+        return (c.x - mx) * px + (c.y - my) * py;
+      };
+
+      const midNode: Node = { id: uid(), label: '', x: M.x, y: M.y, labelOffset: { ...NO_OFFSET }, labelHidden: true };
+      const e1: Edge = { id: uid(), fromNodeId: A.id, toNodeId: midNode.id, curveOffset: offsetOf(A, M, leftCp) };
+      const e2: Edge = { id: uid(), fromNodeId: midNode.id, toNodeId: B.id, curveOffset: offsetOf(M, B, rightCp) };
+
+      const edges = s.edges.flatMap(e => e.id === id ? [e1, e2] : [e]);
+
+      // La CDV du tronçon couvre désormais les deux moitiés.
+      const zones = s.zones.map(z => z.edgeIds.includes(id)
+        ? { ...z, edgeIds: z.edgeIds.flatMap(eid => eid === id ? [e1.id, e2.id] : [eid]) }
+        : z);
+
+      // Signaux : réaffectés à la moitié correspondant à leur position.
+      const clamp = (p: number) => Math.min(0.9, Math.max(0.1, p));
+      const signals = s.signals.map(sig => {
+        if (sig.edgeId !== id) return sig;
+        return sig.position <= 0.5
+          ? { ...sig, edgeId: e1.id, position: clamp(sig.position * 2) }
+          : { ...sig, edgeId: e2.id, position: clamp((sig.position - 0.5) * 2) };
+      });
+
+      // Branches d'aiguilles : l'aiguille à l'extrémité A garde la moitié e1, celle en B la moitié e2.
+      const switches = s.switches.map(sw => {
+        if (sw.entryEdgeId !== id && sw.straightEdgeId !== id && sw.divergingEdgeId !== id) return sw;
+        const half = sw.nodeId === B.id ? e2.id : e1.id;
+        const fix = (ref: string | null) => ref === id ? half : ref;
+        return { ...sw, entryEdgeId: fix(sw.entryEdgeId), straightEdgeId: fix(sw.straightEdgeId), divergingEdgeId: fix(sw.divergingEdgeId) };
+      });
+
+      // Itinéraires : le tronçon est remplacé par ses deux moitiés.
+      const routes = Object.fromEntries(Object.entries(s.routes).map(([rid, r]) =>
+        r.edgeIds.includes(id)
+          ? [rid, { ...r, edgeIds: r.edgeIds.flatMap(eid => eid === id ? [e1.id, e2.id] : [eid]) }]
+          : [rid, r],
+      ));
+
+      // Trains éventuellement présents sur le tronçon.
+      const trains = s.trains.map(t => {
+        if (t.edgeId !== id) return t;
+        return t.t <= 0.5
+          ? { ...t, edgeId: e1.id, t: t.t * 2 }
+          : { ...t, edgeId: e2.id, t: (t.t - 0.5) * 2 };
+      });
+
+      return {
+        nodes: [...s.nodes, midNode],
+        edges, zones, signals, switches, routes, trains,
+        selection: { type: 'edge', id: e1.id },
       };
     });
   },
@@ -1222,6 +1314,23 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
   deleteTextLabel: (id) => {
     saveUndo();
     set(s => ({ textLabels: s.textLabels.filter(t => t.id !== id), selection: null }));
+  },
+
+  // ── Ronds (repères origine/destination) ──────────────────────────────────────
+
+  addRond: (x, y) => {
+    saveUndo();
+    const rond: Rond = { id: uid(), text: 'R', x, y, r: 15 };
+    set(s => ({ ronds: [...s.ronds, rond], selection: { type: 'rond', id: rond.id } }));
+  },
+
+  updateRond: (id, patch) => {
+    set(s => ({ ronds: s.ronds.map(r => r.id === id ? { ...r, ...patch } : r) }));
+  },
+
+  deleteRond: (id) => {
+    saveUndo();
+    set(s => ({ ronds: s.ronds.filter(r => r.id !== id), selection: null }));
   },
 
   // ── PupitreLabels ────────────────────────────────────────────────────────────
@@ -2051,11 +2160,11 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
   // ── Persistence ────────────────────────────────────────────────────────────
 
   exportLayout: () => {
-    const { nodes, edges, zones, signals, switches, textLabels, pupitreLabels, routes, panelButtons } = get();
-    return JSON.stringify({ nodes, edges, zones, signals, switches, textLabels, pupitreLabels, routes, panelButtons }, null, 2);
+    const { nodes, edges, zones, signals, switches, textLabels, ronds, pupitreLabels, routes, panelButtons } = get();
+    return JSON.stringify({ nodes, edges, zones, signals, switches, textLabels, ronds, pupitreLabels, routes, panelButtons }, null, 2);
   },
 
-  loadLayout: ({ nodes, edges, zones, signals, switches, textLabels, routes, panelButtons, ...rest }) => {
+  loadLayout: ({ nodes, edges, zones, signals, switches, textLabels, ronds, routes, panelButtons, ...rest }) => {
     const pupitreLabels = (rest as any).pupitreLabels ?? [];
     // Build routeInterlockingStates: one idle entry per button that has a routeId
     const importedButtons = panelButtons ?? {};
@@ -2083,6 +2192,7 @@ export const useRailwayStore = create<RailwayStore>((set, get) => {
       signals:   signals.map(s => ({ ...s,  labelOffset: s.labelOffset  ?? { ...NO_OFFSET } })),
       switches:  (switches ?? []).map(sw => ({ ...sw, labelOffset: sw.labelOffset ?? { ...NO_OFFSET }, discordanceStraight: false, discordanceDiverging: false })),
       textLabels: textLabels ?? [],
+      ronds:      ronds ?? [],
       pupitreLabels,
       routes:     importedRoutes,
       panelButtons: importedButtons,

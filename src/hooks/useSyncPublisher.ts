@@ -17,6 +17,7 @@ function extractSnapshot(): SyncSnapshot {
     signals:                 s.signals,
     switches:                s.switches,
     textLabels:              s.textLabels,
+    ronds:                   s.ronds,
     pupitreLabels:           s.pupitreLabels,
     routes:                  s.routes,
     panelButtons:            s.panelButtons,
